@@ -4,7 +4,7 @@
  */
 export const BROWSER_UTILS_CODE = `
 window.TiramisuUtils = {
-    // Math Helpers
+    // --- Math Helpers ---
     lerp: (start, end, t) => start * (1 - t) + end * t,
     
     clamp: (val, min, max) => Math.min(Math.max(val, min), max),
@@ -15,7 +15,7 @@ window.TiramisuUtils = {
 
     toRad: (deg) => deg * (Math.PI / 180),
 
-    // Easing Functions (t is 0-1)
+    // --- Easing Functions (t is 0-1) ---
     easeInQuad: (t) => t * t,
     easeOutQuad: (t) => t * (2 - t),
     easeInOutQuad: (t) => t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
@@ -45,6 +45,50 @@ window.TiramisuUtils = {
         } else {
             return n1 * (t -= 2.625 / d1) * t + 0.984375;
         }
+    },
+
+    // --- Canvas Helpers ---
+    
+    /**
+     * Draws a rounded rectangle path.
+     * Note: You must call ctx.fill() or ctx.stroke() after this.
+     */
+    drawRoundedRect: (ctx, x, y, w, h, r) => {
+        if (w < 2 * r) r = w / 2;
+        if (h < 2 * r) r = h / 2;
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+    },
+
+    /**
+     * Draws text wrapped within a specific width.
+     * Returns the final Y position.
+     */
+    drawParagraph: (ctx, text, x, y, maxWidth, lineHeight) => {
+        const words = text.split(' ');
+        let line = '';
+        let currentY = y;
+
+        for(let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+            if (testWidth > maxWidth && n > 0) {
+                ctx.fillText(line, x, currentY);
+                line = words[n] + ' ';
+                currentY += lineHeight;
+            }
+            else {
+                line = testLine;
+            }
+        }
+        ctx.fillText(line, x, currentY);
+        return currentY + lineHeight;
     }
 };
 `;

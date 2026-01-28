@@ -14,6 +14,10 @@ export interface AnimationUtils {
     easeInElastic(t: number): number;
     easeOutElastic(t: number): number;
     easeOutBounce(t: number): number;
+
+    // Helpers
+    drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void;
+    drawParagraph(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number): number;
 }
 
 export interface RenderConfig<T = any> {

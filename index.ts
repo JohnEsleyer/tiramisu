@@ -4,54 +4,54 @@ const engine = new Tiramisu({
     width: 1280,
     height: 720,
     fps: 30,
-    durationSeconds: 6,
-    outputFile: "timeline_demo.mp4",
+    durationSeconds: 5,
+    outputFile: "text_demo.mp4",
     fonts: [
-        { name: 'Roboto', url: 'https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxK.woff2' },
-        { name: 'Lobster', url: 'https://fonts.gstatic.com/s/lobster/v28/neILzCirqoswsqX9_oUD.woff2' }
+        { name: 'Roboto', url: 'https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxK.woff2' }
     ]
 });
 
-// Clip 1: Background (Runs for full duration)
-engine.addClip(0, 6, ({ ctx, width, height }) => {
-    ctx.fillStyle = "#2c3e50";
+// Clip 1: Background
+engine.addClip(0, 5, ({ ctx, width, height }) => {
+    ctx.fillStyle = "#1e272e";
     ctx.fillRect(0, 0, width, height);
-}, 0); // zIndex 0
+}, 0);
 
-// Clip 2: Intro Text (0s to 3s)
-engine.addClip(0, 3, ({ ctx, width, height, localProgress, utils }) => {
-    const y = utils.lerp(-100, height/2, utils.easeOutElastic(localProgress));
+// Clip 2: Wrapped Text Box
+engine.addClip(0, 5, ({ ctx, width, height, localProgress, utils }) => {
+    const boxWidth = 600;
+    const boxHeight = 400;
+    const x = (width - boxWidth) / 2;
+    const y = utils.lerp(height + 100, (height - boxHeight) / 2, utils.easeOutCubic(Math.min(localProgress * 2, 1)));
     
-    ctx.font = "100px 'Lobster'"; // Using Custom Font
-    ctx.fillStyle = "#ecf0f1";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Hello World", width/2, y);
+    // Draw Panel
+    ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+    ctx.lineWidth = 2;
     
-    ctx.font = "30px 'Roboto'";
-    ctx.fillStyle = "#bdc3c7";
-    ctx.fillText("Timeline System V1", width/2, y + 80);
-}, 1);
-
-// Clip 3: Outro Circle (3s to 6s)
-engine.addClip(3, 3, ({ ctx, width, height, localProgress, utils }) => {
-    const scale = utils.lerp(0, 20, localProgress);
-    const alpha = 1 - localProgress;
-    
-    ctx.translate(width/2, height/2);
-    ctx.beginPath();
-    ctx.arc(0, 0, 50 * scale, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(231, 76, 60, ${alpha})`;
+    utils.drawRoundedRect(ctx, x, y, boxWidth, boxHeight, 20);
     ctx.fill();
-}, 1);
+    ctx.stroke();
 
-// Clip 4: Overlay Watermark (Appears at 4s)
-engine.addClip(4, 2, ({ ctx, width, height, localProgress }) => {
-    ctx.font = "20px 'Roboto'";
-    ctx.fillStyle = "white";
-    ctx.globalAlpha = localProgress; // Fade in
-    ctx.fillText("Built with Tiramisu", width - 200, height - 50);
-    ctx.globalAlpha = 1.0; // Reset
-}, 2); // zIndex 2 (Top)
+    // Draw Header
+    ctx.fillStyle = "#00d2ff";
+    ctx.font = "bold 40px 'Roboto'";
+    ctx.fillText("Feature: Text Wrapping", x + 30, y + 60);
+
+    // Draw Wrapped Body Text
+    ctx.fillStyle = "#d2dae2";
+    ctx.font = "30px 'Roboto'";
+    
+    const longText = "This is a demonstration of the new drawParagraph utility. " + 
+                     "It automatically splits long strings into lines based on a maximum width. " +
+                     "This makes it much easier to create cards, subtitles, and descriptions " +
+                     "without manually calculating line breaks.";
+    
+    // Opacity fade in for text
+    ctx.globalAlpha = Math.max(0, (localProgress - 0.5) * 2);
+    utils.drawParagraph(ctx, longText, x + 30, y + 120, boxWidth - 60, 45);
+    ctx.globalAlpha = 1;
+
+}, 1);
 
 await engine.render();
