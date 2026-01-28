@@ -30,6 +30,8 @@ export interface RenderConfig<T = any> {
     audioFile?: string;
     /** Images to preload */
     assets?: string[];
+    /** Videos to preload */
+    videos?: string[];
     /** Fonts to load (CSS URL or path) */
     fonts?: { name: string, url: string }[];
     data?: T;
@@ -52,6 +54,7 @@ export interface RenderContext<T = any> {
     fps: number;
     data: T;
     assets: Record<string, HTMLImageElement>;
+    videos: Record<string, HTMLVideoElement>;
     utils: AnimationUtils;
 }
 

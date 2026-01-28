@@ -12,13 +12,6 @@ export class Tiramisu<T = any> {
         this.config = { headless: true, ...config };
     }
 
-    /**
-     * Add a clip to the timeline.
-     * @param startSeconds When the clip starts
-     * @param durationSeconds How long the clip lasts
-     * @param fn The drawing function
-     * @param zIndex Layer order (default 0)
-     */
     public addClip(startSeconds: number, durationSeconds: number, fn: DrawFunction<T>, zIndex: number = 0) {
         const startFrame = Math.floor(startSeconds * this.config.fps);
         const endFrame = startFrame + Math.floor(durationSeconds * this.config.fps);
@@ -33,7 +26,7 @@ export class Tiramisu<T = any> {
     }
 
     public async render() {
-        const { width, height, fps, durationSeconds, outputFile, headless, audioFile, data, assets, fonts } = this.config;
+        const { width, height, fps, durationSeconds, outputFile, headless, audioFile, data, assets, videos, fonts } = this.config;
         const totalFrames = Math.ceil(fps * durationSeconds);
 
         const server = new TiramisuServer();
@@ -50,6 +43,7 @@ export class Tiramisu<T = any> {
             height, 
             data || {}, 
             assets || [],
+            videos || [], // Pass videos
             fonts || []
         );
 
