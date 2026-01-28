@@ -19,8 +19,8 @@ export class TiramisuEncoder {
 
         this.process = Bun.spawn(ffmpegArgs, {
             stdin: "pipe",
-            stdout: "inherit",
-            stderr: "inherit",
+            stdout: "ignore", // Silence FFmpeg output for clean CLI
+            stderr: "ignore",
         });
     }
 
