@@ -1,17 +1,24 @@
 {
-  "compilerOptions": {
-    "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleDetection": "force",
-    "jsx": "react-jsx",
-    "allowJs": true,
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "noEmit": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "types": ["bun-types", "node"]
+  "name": "tiramisu",
+  "version": "2.0.0",
+  "description": "High-performance programmatic video creation engine",
+  "main": "index.ts",
+  "module": "index.ts",
+  "types": "index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun run render.ts",
+    "render": "bun run render.ts",
+    "dev": "bun run --watch render.ts"
+  },
+  "dependencies": {
+    "puppeteer": "^24.36.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
   }
 }
