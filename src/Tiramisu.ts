@@ -2,6 +2,7 @@ import { TiramisuServer } from './Server';
 import { TiramisuBrowser } from './Browser';
 import { TiramisuEncoder } from './Encoder';
 import { TiramisuCLI } from './CLI';
+import { AudioAnalyzer } from './AudioAnalysis'; // New Import
 import type { RenderConfig, DrawFunction, Clip } from './types';
 
 export class Tiramisu<T = any> {
@@ -32,7 +33,19 @@ export class Tiramisu<T = any> {
         const server = new TiramisuServer();
         const browser = new TiramisuBrowser();
         const cli = new TiramisuCLI(totalFrames);
+        const analyzer = new AudioAnalyzer();
+
+        // 1. Analyze Audio (if present)
+        let audioLevels: number[] = [];
+        if (audioFile) {
+            try {
+                audioLevels = await analyzer.analyze(audioFile, fps, durationSeconds);
+            } catch (e) {
+                console.warn("⚠️ Failed to analyze audio. Visualization will not react.", e);
+            }
+        }
         
+        // 2. Start Server & Browser
         const url = server.start();
         await browser.init(width, height, headless ?? true);
         
@@ -43,14 +56,17 @@ export class Tiramisu<T = any> {
             height, 
             data || {}, 
             assets || [],
-            videos || [], // Pass videos
-            fonts || []
+            videos || [], 
+            fonts || [],
+            audioLevels // Pass analyzed data
         );
 
+        // 3. Start Encoder
         const encoder = new TiramisuEncoder(fps, outputFile, audioFile);
 
         cli.start();
 
+        // 4. Render Loop
         for (let i = 0; i < totalFrames; i++) {
             const frameBuffer = await browser.renderFrame(i, fps, totalFrames);
             await encoder.writeFrame(frameBuffer);

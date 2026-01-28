@@ -28,11 +28,8 @@ export interface RenderConfig<T = any> {
     outputFile: string;
     headless?: boolean;
     audioFile?: string;
-    /** Images to preload */
     assets?: string[];
-    /** Videos to preload */
     videos?: string[];
-    /** Fonts to load (CSS URL or path) */
     fonts?: { name: string, url: string }[];
     data?: T;
 }
@@ -40,11 +37,15 @@ export interface RenderConfig<T = any> {
 export interface RenderContext<T = any> {
     // Global Time
     frame: number;
-    progress: number; // 0 to 1 (Global)
+    progress: number;
     
-    // Local Time (Relative to Clip)
+    // Local Time
     localFrame: number;
-    localProgress: number; // 0 to 1 (Clip)
+    localProgress: number;
+
+    // Audio Data
+    /** Current audio volume (0.0 to 1.0) for this frame */
+    audioVolume: number;
 
     // Canvas & Resources
     ctx: CanvasRenderingContext2D;
@@ -64,6 +65,6 @@ export interface Clip<T = any> {
     id: string;
     startFrame: number;
     endFrame: number;
-    zIndex: number; // Higher draws on top
-    drawFunction: string; // Serialized
+    zIndex: number;
+    drawFunction: string;
 }

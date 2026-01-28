@@ -13,7 +13,6 @@ export class TiramisuBrowser {
                 '--no-sandbox', 
                 '--disable-setuid-sandbox', 
                 '--font-render-hinting=none',
-                // Required for autoplay/seeking without user interaction
                 '--autoplay-policy=no-user-gesture-required' 
             ]
         });
@@ -31,7 +30,8 @@ export class TiramisuBrowser {
         data: any, 
         assets: string[],
         videos: string[],
-        fonts: { name: string, url: string }[]
+        fonts: { name: string, url: string }[],
+        audioLevels: number[] // New parameter
     ) {
         if (!this.page) return;
         
@@ -40,7 +40,6 @@ export class TiramisuBrowser {
 
         await this.page.evaluate(BROWSER_UTILS_CODE);
 
-        // Inject everything into the browser
         await this.page.evaluate(async (
             clipList: Clip[], 
             w: number, 
@@ -48,81 +47,54 @@ export class TiramisuBrowser {
             injectedData: any, 
             assetList: string[],
             videoList: string[],
-            fontList: { name: string, url: string }[]
+            fontList: { name: string, url: string }[],
+            levels: number[] // Receive levels
         ) => {
             // @ts-ignore
             window.setupStage(w, h);
 
-            // --- 1. Load Fonts ---
+            // Load Fonts
             if (fontList && fontList.length > 0) {
-                console.log(`Loading ${fontList.length} fonts...`);
                 const fontPromises = fontList.map(f => {
                     const font = new FontFace(f.name, `url(${f.url})`);
-                    return font.load()
-                        .then(loaded => {
-                            // @ts-ignore
-                            document.fonts.add(loaded);
-                        })
-                        .catch(err => console.error(`Failed to load font ${f.name}`, err));
+                    return font.load().then(loaded => {
+                         // @ts-ignore
+                         document.fonts.add(loaded);
+                    }).catch(e => console.error(e));
                 });
                 await Promise.all(fontPromises);
             }
 
-            // --- 2. Load Images ---
+            // Load Images
             // @ts-ignore
             window.loadedAssets = {};
-            const imagePromises = assetList.map(src => new Promise((resolve) => {
-                const img = new Image();
-                img.crossOrigin = "Anonymous";
-                img.src = src; 
-                img.onload = () => { 
-                    // @ts-ignore
-                    window.loadedAssets[src] = img; 
-                    resolve(null); 
-                };
-                img.onerror = () => {
-                    console.error(`Failed image: ${src}`);
-                    resolve(null);
-                }
+            const imagePromises = assetList.map(src => new Promise(res => {
+                const img = new Image(); img.crossOrigin="Anonymous"; img.src = src;
+                // @ts-ignore
+                img.onload = () => { window.loadedAssets[src] = img; res(null); };
+                img.onerror = () => res(null);
             }));
 
-            // --- 3. Load Videos ---
+            // Load Videos
             // @ts-ignore
             window.loadedVideos = {};
-            const videoPromises = videoList.map(src => new Promise((resolve) => {
-                const vid = document.createElement('video');
-                vid.crossOrigin = "Anonymous";
-                vid.src = src;
-                vid.muted = true;
-                vid.playsInline = true;
-                vid.preload = "auto";
-                
-                // We append to body but hide it, so it's part of the DOM (helps with some browser quirks)
-                vid.style.display = "none";
-                document.body.appendChild(vid);
-
-                vid.onloadeddata = () => {
-                    // @ts-ignore
-                    window.loadedVideos[src] = vid;
-                    resolve(null);
-                };
-                vid.onerror = () => {
-                    console.error(`Failed video: ${src}`);
-                    resolve(null);
-                }
+            const videoPromises = videoList.map(src => new Promise(res => {
+                const vid = document.createElement('video'); vid.crossOrigin="Anonymous"; vid.src = src; vid.muted = true; vid.playsInline = true; vid.style.display = "none"; document.body.appendChild(vid);
+                // @ts-ignore
+                vid.onloadeddata = () => { window.loadedVideos[src] = vid; res(null); };
+                vid.onerror = () => res(null);
             }));
 
             await Promise.all([...imagePromises, ...videoPromises]);
-            console.log(`Assets loaded: ${assetList.length} images, ${videoList.length} videos.`);
 
-            // --- 4. Hydrate Clips ---
+            // Hydrate Clips
             // @ts-ignore
             window.activeClips = clipList.map(c => ({
                 ...c,
                 fn: new Function('return ' + c.drawFunction)()
             })).sort((a, b) => a.zIndex - b.zIndex);
 
-            // --- 5. Render Loop ---
+            // Render Loop
             // @ts-ignore
             window.renderFrame = async (frame, fps, totalFrames) => {
                 const canvas = document.getElementById('stage') as HTMLCanvasElement;
@@ -130,41 +102,35 @@ export class TiramisuBrowser {
                 const currentTime = frame / fps;
 
                 // Sync Videos
-                // We must ensure all videos are sought to the exact time of the frame
-                // before we draw.
                 // @ts-ignore
                 const videoSyncPromises = Object.values(window.loadedVideos).map((vid: HTMLVideoElement) => {
                     return new Promise(resolve => {
-                        // If already at time, skip
                         if (Math.abs(vid.currentTime - currentTime) < 0.001) return resolve(null);
-
-                        const onSeek = () => {
-                            resolve(null);
-                        };
-                        
+                        const onSeek = () => resolve(null);
                         vid.addEventListener('seeked', onSeek, { once: true });
                         vid.currentTime = currentTime;
                     });
                 });
                 await Promise.all(videoSyncPromises);
 
-                // Auto Clear
                 ctx.clearRect(0, 0, w, h);
                 
-                // Iterate Clips
+                // Retrieve Audio Volume for this frame
+                const currentVolume = levels[frame] || 0;
+
                 // @ts-ignore
                 window.activeClips.forEach(clip => {
                     if (frame >= clip.startFrame && frame < clip.endFrame) {
                         const localFrame = frame - clip.startFrame;
                         const duration = clip.endFrame - clip.startFrame;
-                        const localProgress = localFrame / (duration - 1 || 1);
-
-                        // Execute Draw
+                        
                         clip.fn({
                             frame,
                             progress: frame / (totalFrames - 1 || 1),
                             localFrame,
-                            localProgress,
+                            localProgress: localFrame / (duration - 1 || 1),
+                            // Inject Audio
+                            audioVolume: currentVolume,
                             ctx,
                             canvas,
                             width: w,
@@ -181,7 +147,7 @@ export class TiramisuBrowser {
                     }
                 });
             };
-        }, clips, width, height, data, assets, videos, fonts);
+        }, clips, width, height, data, assets, videos, fonts, audioLevels);
     }
 
     public async renderFrame(frame: number, fps: number, totalFrames: number): Promise<Uint8Array> {
