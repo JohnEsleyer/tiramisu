@@ -1,27 +1,15 @@
 {
   "name": "tiramisu",
   "version": "2.1.0",
-  "description": "High-performance programmatic video creation engine",
-  "main": "./index.ts",
-  "module": "./index.ts",
-  "types": "./index.ts",
+  "main": "index.ts",
+  "module": "index.ts",
+  "types": "index.ts",
   "type": "module",
-  "exports": {
-    ".": "./index.ts",
-    "./types": "./src/types.ts",
-    "./utils": "./src/Utils.ts"
-  },
-  "scripts": {
-    "render:example": "bun run examples/synthwave.ts"
-  },
   "dependencies": {
     "puppeteer": "^24.36.1"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/node": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
   }
 }

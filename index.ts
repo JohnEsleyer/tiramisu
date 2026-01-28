@@ -1,11 +1,11 @@
 import { Tiramisu } from "./src/Tiramisu";
 
-// Named Export: import { Tiramisu } from "tiramisu"
+// This resolves "declared locally but not exported"
 export { Tiramisu };
 
-// Default Export: import Tiramisu from "tiramisu"
+// This resolves errors when using "import Tiramisu from 'tiramisu'"
 export default Tiramisu;
 
-// Re-export types and utils
+// Export all supporting types and utilities
 export * from "./src/types";
 export { BROWSER_UTILS_CODE } from "./src/Utils";
