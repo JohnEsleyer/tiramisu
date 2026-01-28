@@ -1,14 +1,11 @@
-/**
- * Tiramisu Core Library Entry Point
- */
+import { Tiramisu } from "./src/Tiramisu";
 
-export { Tiramisu } from "./src/Tiramisu";
-export { TiramisuServer } from "./src/Server";
-export { TiramisuBrowser } from "./src/Browser";
-export { AudioAnalyzer } from "./src/AudioAnalysis";
+// Named Export: import { Tiramisu } from "tiramisu"
+export { Tiramisu };
 
-// Export types for consumers
+// Default Export: import Tiramisu from "tiramisu"
+export default Tiramisu;
+
+// Re-export types and utils
 export * from "./src/types";
-
-// Export browser-safe utils for frontend injection
 export { BROWSER_UTILS_CODE } from "./src/Utils";
