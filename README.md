@@ -1,27 +1,15 @@
-
 # 🍰 Tiramisu
 
-**Tiramisu** is a lightweight, programmatic video creation engine built on [Bun](https://bun.sh), [Puppeteer](https://pptr.dev/), and [FFmpeg](https://ffmpeg.org/). 
-
-It allows you to build high-quality videos using the standard HTML5 Canvas API with zero bloat. It handles the orchestration of a headless browser, frame-by-frame rendering, and real-time video encoding.
+**Tiramisu** is a professional-grade, programmatic video creation engine built on [Bun](https://bun.sh). It combines the flexibility of the HTML5 Canvas with the power of FFmpeg to render high-quality video content from code.
 
 ## ✨ Features
 
-- **Standard Canvas API**: If you can draw it in a browser, you can turn it into a video.
-- **Modular Architecture**: Clean separation between the Stage (Server), the Performer (Browser), and the Producer (FFmpeg Encoder).
-- **Data Injection**: Pass custom JSON data from your Bun environment directly into your drawing logic.
-- **Asset Preloading**: Automatically preload images and logos before rendering starts.
-- **Built-in Utils**: Native support for Easings (Bounce, Elastic, etc.), Lerp, and Math helpers inside the render context.
-- **Sleek CLI**: Beautiful Unicode progress bars with ETA and real-time FPS tracking.
-- **Audio Support**: Easily mix a soundtrack or voiceover into your final export.
-
-## 🛠 Prerequisites
-
-You must have **FFmpeg** installed on your system:
-
-- **macOS:** `brew install ffmpeg`
-- **Linux:** `sudo apt install ffmpeg`
-- **Windows:** `winget install FFmpeg`
+- **Timeline System:** Organize complex animations into Clips with specific start/end times and z-indexes.
+- **Audio Reactivity:** Built-in analyzer extracts volume levels per frame, allowing animations to pulse to the beat.
+- **Video & Image Assets:** Frame-accurate video syncing and automatic image preloading.
+- **Text & UI Utilities:** Built-in support for text wrapping and rounded shapes.
+- **Modular Core:** Clean separation between the Server, Browser, and Encoder.
+- **Zero-Disk Rendering:** Direct piping from Puppeteer to FFmpeg.
 
 ## 📦 Installation
 
@@ -29,68 +17,75 @@ You must have **FFmpeg** installed on your system:
 bun install
 ```
 
-## 🎬 Quick Start
+*Requires FFmpeg to be installed on your system.*
+
+## 🚀 Usage
+
+### 1. Basic Setup
 
 ```typescript
-import { Tiramisu, type RenderContext } from "./src/Tiramisu";
+import { Tiramisu } from "./src/Tiramisu";
 
-interface VideoData {
-    title: string;
-}
-
-const engine = new Tiramisu<VideoData>({
-    width: 1280,
-    height: 720,
+const engine = new Tiramisu({
+    width: 1920,
+    height: 1080,
     fps: 30,
     durationSeconds: 5,
-    outputFile: "output.mp4",
-    data: { title: "Hello Tiramisu!" },
-    assets: ["./logo.png"]
+    outputFile: "out.mp4"
 });
-
-engine.scene(({ ctx, width, height, progress, data, assets, utils }) => {
-    // 1. Background
-    ctx.fillStyle = "#111";
-    ctx.fillRect(0, 0, width, height);
-
-    // 2. Animated Position using Utils
-    const y = utils.lerp(100, 400, utils.easeOutBounce(progress));
-
-    // 3. Draw Preloaded Asset
-    const logo = assets["./logo.png"];
-    if (logo) ctx.drawImage(logo, 100, y, 100, 100);
-
-    // 4. Use Injected Data
-    ctx.fillStyle = "white";
-    ctx.font = "bold 50px sans-serif";
-    ctx.fillText(data.title, 250, y + 65);
-});
-
-await engine.render();
 ```
 
-## 🏗 Modular Architecture
+### 2. Adding Clips
 
-Tiramisu is split into several focused components:
+Tiramisu uses a **Clip** system. Each clip represents a drawing function active for a specific time range.
 
-1.  **`TiramisuServer`**: A lightweight Bun server that serves the HTML template and your local static assets (images, fonts).
-2.  **`TiramisuBrowser`**: Manages the Puppeteer instance, injects your logic, and handles high-resolution screenshots.
-3.  **`TiramisuEncoder`**: Spawns an FFmpeg process and pipes raw PNG data into it for efficient encoding without temporary files.
-4.  **`TiramisuCLI`**: Manages the terminal output, showing a smooth progress bar and render stats.
+```typescript
+// Background (Layer 0)
+engine.addClip(0, 5, ({ ctx, width, height }) => {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, width, height);
+}, 0);
 
-## 🧠 Important: Scoping & Context
+// Text (Layer 1) - Starts at 1s, lasts 3s
+engine.addClip(1, 3, ({ ctx, width, height, localProgress, utils }) => {
+    const y = utils.lerp(0, height/2, localProgress);
+    ctx.fillStyle = "white";
+    ctx.fillText("Hello World", width/2, y);
+}, 1);
+```
 
-The `scene` function is stringified and executed **inside the browser context**. 
+### 3. Audio Reactivity
 
-- **No Closures**: You cannot reference variables defined outside the `scene` function. Use the `data` property in the config to pass external information.
-- **Canvas Only**: Use the provided `ctx` (CanvasRenderingContext2D) for all drawing.
-- **Async Assets**: Images are preloaded and provided in the `assets` map before your script runs.
+Pass an `audioFile` in the config. Tiramisu will analyze it and provide `audioVolume` (0.0 - 1.0) in the context.
 
-## 🚀 Scripts
+```typescript
+engine.addClip(0, 10, ({ ctx, audioVolume }) => {
+    const radius = 100 + (audioVolume * 50);
+    ctx.arc(100, 100, radius, 0, Math.PI*2);
+    ctx.fill();
+});
+```
 
-- `bun run render`: Run the default `index.ts` animation.
-- `bun run dev`: Run with watch mode for rapid iteration.
-- `bun run clean`: Remove generated `.mp4` files.
+### 4. Assets & Fonts
 
----
-Built with 🍰 by JohnEsleyer
+```typescript
+const engine = new Tiramisu({
+    // ... config
+    assets: ["./image.png"],
+    videos: ["./background.mp4"],
+    fonts: [{ name: 'MyFont', url: './MyFont.woff2' }]
+});
+
+// Access via ctx.assets['./image.png'] or ctx.videos['...']
+```
+
+## 🏗 Architecture
+
+1.  **Server:** Hosts the static assets and HTML stage.
+2.  **Browser:** Puppeteer instance that executes your drawing logic frame-by-frame.
+3.  **Analyzer:** FFmpeg process that reads audio data for visualization.
+4.  **Encoder:** FFmpeg process that stitches screenshots into an MP4.
+
+## 📝 License
+
+MIT
