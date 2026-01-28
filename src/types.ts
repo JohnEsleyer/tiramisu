@@ -24,13 +24,23 @@ export interface RenderConfig<T = any> {
     outputFile: string;
     headless?: boolean;
     audioFile?: string;
+    /** Images to preload */
     assets?: string[];
+    /** Fonts to load (CSS URL or path) */
+    fonts?: { name: string, url: string }[];
     data?: T;
 }
 
 export interface RenderContext<T = any> {
+    // Global Time
     frame: number;
-    progress: number;
+    progress: number; // 0 to 1 (Global)
+    
+    // Local Time (Relative to Clip)
+    localFrame: number;
+    localProgress: number; // 0 to 1 (Clip)
+
+    // Canvas & Resources
     ctx: CanvasRenderingContext2D;
     canvas: HTMLCanvasElement;
     width: number;
@@ -38,8 +48,15 @@ export interface RenderContext<T = any> {
     fps: number;
     data: T;
     assets: Record<string, HTMLImageElement>;
-    /** Utility functions for animation (Easing, Math) */
     utils: AnimationUtils;
 }
 
 export type DrawFunction<T = any> = (context: RenderContext<T>) => void;
+
+export interface Clip<T = any> {
+    id: string;
+    startFrame: number;
+    endFrame: number;
+    zIndex: number; // Higher draws on top
+    drawFunction: string; // Serialized
+}

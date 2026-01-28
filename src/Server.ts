@@ -10,7 +10,7 @@ export class TiramisuServer {
 
         this.server = Bun.serve({
             port: 0,
-            fetch(req) {
+            async fetch(req) {
                 const url = new URL(req.url);
                 
                 // Serve the stage template on root
@@ -20,11 +20,20 @@ export class TiramisuServer {
                     });
                 }
 
+                // Ignore favicon to prevent log spam/errors
+                if (url.pathname === "/favicon.ico") {
+                    return new Response(null, { status: 404 });
+                }
+
                 // Serve static files (images, fonts) from the current working directory
-                // This allows <img src="assets/logo.png"> to work
                 const filePath = join(process.cwd(), url.pathname);
                 const file = Bun.file(filePath);
-                return new Response(file);
+
+                if (await file.exists()) {
+                    return new Response(file);
+                }
+
+                return new Response("Not Found", { status: 404 });
             },
         });
 
