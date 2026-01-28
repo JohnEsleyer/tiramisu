@@ -10,9 +10,17 @@ export class Tiramisu<T = any> {
     private clips: Clip[] = [];
 
     constructor(config: RenderConfig<T>) {
-        this.config = { headless: true, ...config };
+        // We only provide defaults for optional fields. 
+        // Mandatory fields (width, height, fps) are taken directly from config.
+        this.config = { 
+            headless: true, 
+            ...config 
+        };
     }
 
+    /**
+     * Adds a drawing function to the timeline with specific timing and layering.
+     */
     public addClip(startSeconds: number, durationSeconds: number, fn: DrawFunction<T>, zIndex: number = 0) {
         const startFrame = Math.floor(startSeconds * this.config.fps);
         const endFrame = startFrame + Math.floor(durationSeconds * this.config.fps);
@@ -26,8 +34,15 @@ export class Tiramisu<T = any> {
         });
     }
 
+    /**
+     * Orchestrates the full render pipeline: Audio -> Browser -> FFmpeg.
+     */
     public async render() {
-        const { width, height, fps, durationSeconds, outputFile, headless, audioFile, data, assets, videos, fonts } = this.config;
+        const { 
+            width, height, fps, durationSeconds, outputFile, 
+            audioFile, data, assets, videos, fonts, headless 
+        } = this.config;
+        
         const totalFrames = Math.ceil(fps * durationSeconds);
 
         const server = new TiramisuServer();
@@ -35,15 +50,13 @@ export class Tiramisu<T = any> {
         const cli = new TiramisuCLI(totalFrames);
         const analyzer = new AudioAnalyzer();
 
+        // 1. Analyze Audio (if provided)
         let audioLevels: number[] = [];
         if (audioFile) {
-            try {
-                audioLevels = await analyzer.analyze(audioFile, fps, durationSeconds);
-            } catch (e) {
-                console.warn("⚠️ Failed to analyze audio. Visualization will not react.", e);
-            }
+            audioLevels = await analyzer.analyze(audioFile, fps, durationSeconds);
         }
         
+        // 2. Start Stage Server & Puppeteer
         const url = server.start();
         await browser.init(width, height, headless ?? true);
         
@@ -53,21 +66,24 @@ export class Tiramisu<T = any> {
             width, 
             height, 
             data || {}, 
-            assets || [],
+            assets || [], 
             videos || [], 
-            fonts || [],
+            fonts || [], 
             audioLevels
         );
 
+        // 3. Start FFmpeg Encoder
         const encoder = new TiramisuEncoder(fps, outputFile, audioFile);
         cli.start();
 
+        // 4. Main Render Loop
         for (let i = 0; i < totalFrames; i++) {
             const frameBuffer = await browser.renderFrame(i, fps, totalFrames);
             await encoder.writeFrame(frameBuffer);
             cli.update(i + 1);
         }
 
+        // 5. Cleanup Resources
         await encoder.close();
         await browser.close();
         server.stop();
