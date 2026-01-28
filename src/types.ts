@@ -6,6 +6,8 @@ export interface RenderConfig<T = any> {
     outputFile: string;
     headless?: boolean;
     audioFile?: string;
+    /** List of image paths (local or remote) to preload */
+    assets?: string[];
     data?: T;
 }
 
@@ -18,6 +20,8 @@ export interface RenderContext<T = any> {
     height: number;
     fps: number;
     data: T;
+    /** Map of preloaded image assets (key is the path provided in config) */
+    assets: Record<string, HTMLImageElement>;
 }
 
 export type DrawFunction<T = any> = (context: RenderContext<T>) => void;

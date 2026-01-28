@@ -17,7 +17,7 @@ export class Tiramisu<T = any> {
     }
 
     public async render() {
-        const { width, height, fps, durationSeconds, outputFile, headless, audioFile, data } = this.config;
+        const { width, height, fps, durationSeconds, outputFile, headless, audioFile, data, assets } = this.config;
         const totalFrames = Math.ceil(fps * durationSeconds);
 
         const server = new TiramisuServer();
@@ -27,8 +27,8 @@ export class Tiramisu<T = any> {
         const url = server.start();
         await browser.init(width, height, headless ?? true);
         
-        // Pass 'data' to setupScene
-        await browser.setupScene(url, this.drawFunctionString, width, height, data || {});
+        // Pass 'assets' array (defaults to empty)
+        await browser.setupScene(url, this.drawFunctionString, width, height, data || {}, assets || []);
 
         const encoder = new TiramisuEncoder(fps, outputFile, audioFile);
 
