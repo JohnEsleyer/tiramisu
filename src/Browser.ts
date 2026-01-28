@@ -1,4 +1,5 @@
 import puppeteer, { type Browser, type Page } from 'puppeteer';
+import { BROWSER_UTILS_CODE } from './Utils';
 
 export class TiramisuBrowser {
     private browser?: Browser;
@@ -21,6 +22,9 @@ export class TiramisuBrowser {
         console.log(`   Loading Stage: ${url}`);
         await this.page.goto(url);
 
+        // Inject Utils Code First
+        await this.page.evaluate(BROWSER_UTILS_CODE);
+
         // Preload Assets & Inject Logic
         await this.page.evaluate(async (fnString: string, w: number, h: number, injectedData: any, assetList: string[]) => {
             // @ts-ignore
@@ -31,7 +35,7 @@ export class TiramisuBrowser {
             window.loadedAssets = {};
             const loadPromises = assetList.map(src => new Promise((resolve, reject) => {
                 const img = new Image();
-                img.src = src; // Server middleware handles local paths
+                img.src = src; 
                 img.onload = () => { 
                     // @ts-ignore
                     window.loadedAssets[src] = img; 
@@ -68,7 +72,9 @@ export class TiramisuBrowser {
                     fps,
                     data: injectedData,
                     // @ts-ignore
-                    assets: window.loadedAssets
+                    assets: window.loadedAssets,
+                    // @ts-ignore
+                    utils: window.TiramisuUtils
                 });
             };
         }, drawFunctionString, width, height, data, assets);
