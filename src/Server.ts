@@ -10,10 +10,21 @@ export class TiramisuServer {
 
         this.server = Bun.serve({
             port: 0,
-            fetch() {
-                return new Response(htmlContent, {
-                    headers: { "Content-Type": "text/html" },
-                });
+            fetch(req) {
+                const url = new URL(req.url);
+                
+                // Serve the stage template on root
+                if (url.pathname === "/") {
+                    return new Response(htmlContent, {
+                        headers: { "Content-Type": "text/html" },
+                    });
+                }
+
+                // Serve static files (images, fonts) from the current working directory
+                // This allows <img src="assets/logo.png"> to work
+                const filePath = join(process.cwd(), url.pathname);
+                const file = Bun.file(filePath);
+                return new Response(file);
             },
         });
 

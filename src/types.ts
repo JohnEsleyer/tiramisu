@@ -1,13 +1,15 @@
-export interface RenderConfig {
+export interface RenderConfig<T = any> {
     width: number;
     height: number;
     fps: number;
     durationSeconds: number;
     outputFile: string;
     headless?: boolean;
+    audioFile?: string;
+    data?: T;
 }
 
-export interface RenderContext {
+export interface RenderContext<T = any> {
     frame: number;
     progress: number;
     ctx: CanvasRenderingContext2D;
@@ -15,6 +17,7 @@ export interface RenderContext {
     width: number;
     height: number;
     fps: number;
+    data: T;
 }
 
-export type DrawFunction = (context: RenderContext) => void;
+export type DrawFunction<T = any> = (context: RenderContext<T>) => void;

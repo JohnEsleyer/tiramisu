@@ -4,20 +4,20 @@ import { TiramisuEncoder } from './Encoder';
 import { TiramisuCLI } from './CLI';
 import type { RenderConfig, DrawFunction } from './types';
 
-export class Tiramisu {
-    private config: RenderConfig;
+export class Tiramisu<T = any> {
+    private config: RenderConfig<T>;
     private drawFunctionString: string = "() => {}";
 
-    constructor(config: RenderConfig) {
+    constructor(config: RenderConfig<T>) {
         this.config = { headless: true, ...config };
     }
 
-    public scene(fn: DrawFunction) {
+    public scene(fn: DrawFunction<T>) {
         this.drawFunctionString = fn.toString();
     }
 
     public async render() {
-        const { width, height, fps, durationSeconds, outputFile, headless } = this.config;
+        const { width, height, fps, durationSeconds, outputFile, headless, audioFile, data } = this.config;
         const totalFrames = Math.ceil(fps * durationSeconds);
 
         const server = new TiramisuServer();
@@ -26,9 +26,11 @@ export class Tiramisu {
         
         const url = server.start();
         await browser.init(width, height, headless ?? true);
-        await browser.setupScene(url, this.drawFunctionString, width, height);
+        
+        // Pass 'data' to setupScene
+        await browser.setupScene(url, this.drawFunctionString, width, height, data || {});
 
-        const encoder = new TiramisuEncoder(fps, outputFile);
+        const encoder = new TiramisuEncoder(fps, outputFile, audioFile);
 
         cli.start();
 

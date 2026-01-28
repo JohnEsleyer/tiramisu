@@ -11,21 +11,28 @@ export class TiramisuBrowser {
         });
         this.page = await this.browser.newPage();
         await this.page.setViewport({ width, height, deviceScaleFactor: 1 });
+        
+        // Expose console logs from browser to terminal
+        this.page.on('console', msg => console.log('PAGE LOG:', msg.text()));
     }
 
-    public async setupScene(url: string, drawFunctionString: string, width: number, height: number) {
+    public async setupScene(url: string, drawFunctionString: string, width: number, height: number, data: any) {
         if (!this.page) return;
         await this.page.goto(url);
-        await this.page.evaluate((fnString: string, w: number, h: number) => {
+        
+        await this.page.evaluate((fnString: string, w: number, h: number, injectedData: any) => {
             // @ts-ignore
             window.setupStage(w, h);
+            
             // @ts-ignore
             window.userDrawLogic = new Function('return ' + fnString)();
+
             // @ts-ignore
             window.renderFrame = (frame, fps, totalFrames) => {
                 const canvas = document.getElementById('stage') as HTMLCanvasElement;
                 const ctx = canvas.getContext('2d')!;
                 ctx.clearRect(0, 0, w, h);
+                
                 // @ts-ignore
                 window.userDrawLogic({
                     frame,
@@ -34,10 +41,11 @@ export class TiramisuBrowser {
                     canvas,
                     width: w,
                     height: h,
-                    fps
+                    fps,
+                    data: injectedData // Pass data to context
                 });
             };
-        }, drawFunctionString, width, height);
+        }, drawFunctionString, width, height, data);
     }
 
     public async renderFrame(frame: number, fps: number, totalFrames: number): Promise<Uint8Array> {
