@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiramisu Stage</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: black; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body>
+    <canvas id="stage"></canvas>
+    <script>
+        const canvas = document.getElementById('stage');
+        const ctx = canvas.getContext('2d');
+        
+        // Define global state for user variables
+        window.globalState = {};
+
+        // This function will be overwritten by the user's script logic via Puppeteer
+        window.renderFrame = function(frame, fps, durationInFrames, config) {
+            console.warn("No render function defined yet.");
+        };
+
+        // Helper to setup canvas size
+        window.setupStage = function(width, height) {
+            canvas.width = width;
+            canvas.height = height;
+        };
+    </script>
+</body>
+</html>
