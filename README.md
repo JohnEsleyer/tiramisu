@@ -1,91 +1,88 @@
 # 🍰 Tiramisu
 
-**Tiramisu** is a professional-grade, programmatic video creation engine built on [Bun](https://bun.sh). It combines the flexibility of the HTML5 Canvas with the power of FFmpeg to render high-quality video content from code.
+**Tiramisu** is a high-performance, programmatic video creation engine built on [Bun](https://bun.sh). It allows you to generate high-quality MP4 videos by describing scenes using the standard HTML5 Canvas API.
 
-## ✨ Features
+Unlike heavier frameworks, Tiramisu is lightweight, modular, and optimized for speed, featuring a zero-disk-waste pipeline that streams frames directly into FFmpeg.
 
-- **Timeline System:** Organize complex animations into Clips with specific start/end times and z-indexes.
-- **Audio Reactivity:** Built-in analyzer extracts volume levels per frame, allowing animations to pulse to the beat.
-- **Video & Image Assets:** Frame-accurate video syncing and automatic image preloading.
-- **Text & UI Utilities:** Built-in support for text wrapping and rounded shapes.
-- **Modular Core:** Clean separation between the Server, Browser, and Encoder.
-- **Zero-Disk Rendering:** Direct piping from Puppeteer to FFmpeg.
+## 🔗 Repository
+[github.com/JohnEsleyer/tiramisu](https://github.com/JohnEsleyer/tiramisu)
+
+## ✨ Key Features
+
+- **Timeline System**: Modular `addClip()` API to organize animations with specific timing and layering (z-index).
+- **Audio Reactivity**: Built-in audio analyzer that provides real-time volume data (`audioVolume`) for every frame.
+- **Frame-Accurate Video**: Support for video assets that stay perfectly in sync with the timeline.
+- **Asset Preloading**: Automatic preloading for Images, Videos, and Custom Fonts (Google Fonts or local).
+- **Animation Toolbox**: Built-in Easing functions (Bounce, Elastic, etc.), Lerp, Text Wrapping, and Rounded Shapes.
+- **Sleek CLI**: Professional terminal output with progress bars, real-time FPS, and ETA.
+- **Zero-Disk Rendering**: Puppeteer screenshots are piped directly to FFmpeg via STDIN.
+
+## 🛠 Prerequisites
+
+Tiramisu requires **FFmpeg** to be installed on your system to encode the final video:
+
+- **macOS**: `brew install ffmpeg`
+- **Linux**: `sudo apt install ffmpeg`
+- **Windows**: `winget install FFmpeg`
 
 ## 📦 Installation
 
-```bash
-bun install
-```
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/JohnEsleyer/tiramisu.git
+   cd tiramisu
+   ```
 
-*Requires FFmpeg to be installed on your system.*
+2. **Install dependencies:**
+   ```bash
+   bun install
+   ```
 
-## 🚀 Usage
+3. **Run the demo:**
+   ```bash
+   bun run index.ts
+   ```
 
-### 1. Basic Setup
+## 🎬 Quick Start
 
 ```typescript
 import { Tiramisu } from "./src/Tiramisu";
 
 const engine = new Tiramisu({
-    width: 1920,
-    height: 1080,
+    width: 1280,
+    height: 720,
     fps: 30,
     durationSeconds: 5,
-    outputFile: "out.mp4"
+    outputFile: "output.mp4"
 });
-```
 
-### 2. Adding Clips
-
-Tiramisu uses a **Clip** system. Each clip represents a drawing function active for a specific time range.
-
-```typescript
-// Background (Layer 0)
+// Add a background layer
 engine.addClip(0, 5, ({ ctx, width, height }) => {
-    ctx.fillStyle = "black";
+    ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(0, 0, width, height);
 }, 0);
 
-// Text (Layer 1) - Starts at 1s, lasts 3s
-engine.addClip(1, 3, ({ ctx, width, height, localProgress, utils }) => {
-    const y = utils.lerp(0, height/2, localProgress);
+// Add an animated text layer
+engine.addClip(0, 5, ({ ctx, width, height, localProgress, utils }) => {
+    const y = utils.lerp(0, height / 2, utils.easeOutBounce(localProgress));
+    ctx.font = "bold 60px sans-serif";
     ctx.fillStyle = "white";
-    ctx.fillText("Hello World", width/2, y);
+    ctx.textAlign = "center";
+    ctx.fillText("🍰 Tiramisu V2", width / 2, y);
 }, 1);
+
+await engine.render();
 ```
 
-### 3. Audio Reactivity
+## 🧠 Architecture
 
-Pass an `audioFile` in the config. Tiramisu will analyze it and provide `audioVolume` (0.0 - 1.0) in the context.
+Tiramisu is designed with a modular separation of concerns:
 
-```typescript
-engine.addClip(0, 10, ({ ctx, audioVolume }) => {
-    const radius = 100 + (audioVolume * 50);
-    ctx.arc(100, 100, radius, 0, Math.PI*2);
-    ctx.fill();
-});
-```
-
-### 4. Assets & Fonts
-
-```typescript
-const engine = new Tiramisu({
-    // ... config
-    assets: ["./image.png"],
-    videos: ["./background.mp4"],
-    fonts: [{ name: 'MyFont', url: './MyFont.woff2' }]
-});
-
-// Access via ctx.assets['./image.png'] or ctx.videos['...']
-```
-
-## 🏗 Architecture
-
-1.  **Server:** Hosts the static assets and HTML stage.
-2.  **Browser:** Puppeteer instance that executes your drawing logic frame-by-frame.
-3.  **Analyzer:** FFmpeg process that reads audio data for visualization.
-4.  **Encoder:** FFmpeg process that stitches screenshots into an MP4.
+1. **The Server (`Server.ts`)**: A lightweight Bun server that hosts the HTML stage and serves your local assets (images/videos).
+2. **The Browser (`Browser.ts`)**: A Puppeteer-controlled instance that renders frames and ensures asset synchronization.
+3. **The Analyzer (`AudioAnalysis.ts`)**: Uses FFmpeg to extract PCM data and calculate RMS volume levels for reactive visuals.
+4. **The Encoder (`Encoder.ts`)**: Manages the FFmpeg process that converts raw image data into the final video file.
+5. **The Reporter (`CLI.ts`)**: Provides the beautiful Unicode terminal interface.
 
 ## 📝 License
-
 MIT
