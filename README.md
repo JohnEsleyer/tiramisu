@@ -1,24 +1,23 @@
-Here is a comprehensive `README.md` for **Tiramisu**.
 
-```markdown
---- START OF FILE README.md ---
 # 🍰 Tiramisu
 
-**Tiramisu** is a lightweight, programmatic video creation engine built on [Bun](https://bun.sh), [Puppeteer](https://pptr.dev/), and [FFmpeg](https://ffmpeg.org/).
+**Tiramisu** is a lightweight, programmatic video creation engine built on [Bun](https://bun.sh), [Puppeteer](https://pptr.dev/), and [FFmpeg](https://ffmpeg.org/). 
 
-It allows you to create high-quality content videos using the standard HTML5 Canvas API. Think of it as a "headless" motion graphics tool where you describe your scene in code and Tiramisu handles the rendering, frame management, and video encoding.
+It allows you to build high-quality videos using the standard HTML5 Canvas API with zero bloat. It handles the orchestration of a headless browser, frame-by-frame rendering, and real-time video encoding.
 
-## 🚀 Why Tiramisu?
+## ✨ Features
 
-While tools like Remotion are powerful, they often come with the overhead of React and complex state management. Tiramisu follows a **"Frame-by-Frame"** philosophy:
-
-1. **Simplicity:** If you know how to draw on a Canvas, you know how to make a Tiramisu video.
-2. **Performance:** Leveraging Bun's fast runtime and direct piping to FFmpeg.
-3. **No Bloat:** No complex build steps or heavy dependencies—just a browser and a pipe.
+- **Standard Canvas API**: If you can draw it in a browser, you can turn it into a video.
+- **Modular Architecture**: Clean separation between the Stage (Server), the Performer (Browser), and the Producer (FFmpeg Encoder).
+- **Data Injection**: Pass custom JSON data from your Bun environment directly into your drawing logic.
+- **Asset Preloading**: Automatically preload images and logos before rendering starts.
+- **Built-in Utils**: Native support for Easings (Bounce, Elastic, etc.), Lerp, and Math helpers inside the render context.
+- **Sleek CLI**: Beautiful Unicode progress bars with ETA and real-time FPS tracking.
+- **Audio Support**: Easily mix a soundtrack or voiceover into your final export.
 
 ## 🛠 Prerequisites
 
-Before running Tiramisu, you must have **FFmpeg** installed on your system:
+You must have **FFmpeg** installed on your system:
 
 - **macOS:** `brew install ffmpeg`
 - **Linux:** `sudo apt install ffmpeg`
@@ -30,68 +29,68 @@ Before running Tiramisu, you must have **FFmpeg** installed on your system:
 bun install
 ```
 
-## 🎬 Getting Started
-
-The core of Tiramisu is the `scene` method. You provide a function that executes logic for every frame.
+## 🎬 Quick Start
 
 ```typescript
-import { Tiramisu } from "./src/Tiramisu";
+import { Tiramisu, type RenderContext } from "./src/Tiramisu";
 
-const engine = new Tiramisu({
+interface VideoData {
+    title: string;
+}
+
+const engine = new Tiramisu<VideoData>({
     width: 1280,
     height: 720,
     fps: 30,
-    durationSeconds: 10,
-    outputFile: "my-video.mp4"
+    durationSeconds: 5,
+    outputFile: "output.mp4",
+    data: { title: "Hello Tiramisu!" },
+    assets: ["./logo.png"]
 });
 
-engine.scene(({ ctx, width, height, progress }) => {
-    // Standard Canvas API
-    ctx.fillStyle = "black";
+engine.scene(({ ctx, width, height, progress, data, assets, utils }) => {
+    // 1. Background
+    ctx.fillStyle = "#111";
     ctx.fillRect(0, 0, width, height);
 
+    // 2. Animated Position using Utils
+    const y = utils.lerp(100, 400, utils.easeOutBounce(progress));
+
+    // 3. Draw Preloaded Asset
+    const logo = assets["./logo.png"];
+    if (logo) ctx.drawImage(logo, 100, y, 100, 100);
+
+    // 4. Use Injected Data
     ctx.fillStyle = "white";
-    ctx.font = "50px Arial";
-    ctx.fillText("Hello Tiramisu!", 100, 100 + (progress * 200));
+    ctx.font = "bold 50px sans-serif";
+    ctx.fillText(data.title, 250, y + 65);
 });
 
 await engine.render();
 ```
 
-## 🧠 How it Works
+## 🏗 Modular Architecture
 
-Tiramisu orchestrates three main components:
+Tiramisu is split into several focused components:
 
-1.  **The Director (Bun):** A Bun server hosts a local "Stage" (HTML/JS) and manages the project lifecycle.
-2.  **The Performer (Puppeteer):** A headless browser loads the Stage. Tiramisu "injects" your drawing logic into the browser. It iterates through every frame, executes your code, and captures a screenshot.
-3.  **The Producer (FFmpeg):** As screenshots are captured, they are piped directly into an FFmpeg process as a stream of raw image data, which is then encoded into a `.mp4` (H.264) file.
+1.  **`TiramisuServer`**: A lightweight Bun server that serves the HTML template and your local static assets (images, fonts).
+2.  **`TiramisuBrowser`**: Manages the Puppeteer instance, injects your logic, and handles high-resolution screenshots.
+3.  **`TiramisuEncoder`**: Spawns an FFmpeg process and pipes raw PNG data into it for efficient encoding without temporary files.
+4.  **`TiramisuCLI`**: Manages the terminal output, showing a smooth progress bar and render stats.
 
-## ⚠️ Important Note on Scoping
+## 🧠 Important: Scoping & Context
 
-Because the `scene` function is executed **inside the browser context**, it is serialized using `.toString()`. 
+The `scene` function is stringified and executed **inside the browser context**. 
 
-**This means:**
-- You **cannot** use variables from your Bun/Node.js script inside the `scene` function (closures won't work).
-- You **cannot** import external modules inside the `scene` function.
-- All drawing logic must be self-contained within the function provided to `engine.scene`.
+- **No Closures**: You cannot reference variables defined outside the `scene` function. Use the `data` property in the config to pass external information.
+- **Canvas Only**: Use the provided `ctx` (CanvasRenderingContext2D) for all drawing.
+- **Async Assets**: Images are preloaded and provided in the `assets` map before your script runs.
 
-## 🛣 Goals
+## 🚀 Scripts
 
-- [x] Canvas-based frame rendering.
-- [x] FFmpeg piping for zero-disk-space frames.
-- [ ] **Audio Support:** Add background music and voiceover overlays.
-- [ ] **Asset Preloading:** Easily load images and fonts into the browser context before rendering starts.
-- [ ] **Component System:** A library of pre-built shapes, transitions, and text animations.
-- [ ] **Data Injection:** Pass JSON data from Bun into the browser context to drive dynamic videos.
-
-## 🏗 Development
-
-To run the example animation:
-
-```bash
-bun run index.ts
-```
+- `bun run render`: Run the default `index.ts` animation.
+- `bun run dev`: Run with watch mode for rapid iteration.
+- `bun run clean`: Remove generated `.mp4` files.
 
 ---
 Built with 🍰 by JohnEsleyer
-```
