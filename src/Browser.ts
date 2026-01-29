@@ -19,7 +19,8 @@ export class TiramisuBrowser {
         this.page = await this.browser.newPage();
         await this.page.setViewport({ width, height, deviceScaleFactor: 1 });
         
-        this.page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+        // Console logs are disabled to prevent CLI artifacts
+        // this.page.on('console', msg => console.log('PAGE LOG:', msg.text()));
     }
 
     public async setupScene(
@@ -31,7 +32,7 @@ export class TiramisuBrowser {
         assets: string[],
         videos: string[],
         fonts: { name: string, url: string }[],
-        audioLevels: number[] // New parameter
+        audioLevels: number[]
     ) {
         if (!this.page) return;
         
@@ -48,12 +49,11 @@ export class TiramisuBrowser {
             assetList: string[],
             videoList: string[],
             fontList: { name: string, url: string }[],
-            levels: number[] // Receive levels
+            levels: number[]
         ) => {
             // @ts-ignore
             window.setupStage(w, h);
 
-            // Load Fonts
             if (fontList && fontList.length > 0) {
                 const fontPromises = fontList.map(f => {
                     const font = new FontFace(f.name, `url(${f.url})`);
@@ -65,7 +65,6 @@ export class TiramisuBrowser {
                 await Promise.all(fontPromises);
             }
 
-            // Load Images
             // @ts-ignore
             window.loadedAssets = {};
             const imagePromises = assetList.map(src => new Promise(res => {
@@ -75,7 +74,6 @@ export class TiramisuBrowser {
                 img.onerror = () => res(null);
             }));
 
-            // Load Videos
             // @ts-ignore
             window.loadedVideos = {};
             const videoPromises = videoList.map(src => new Promise(res => {
@@ -87,21 +85,18 @@ export class TiramisuBrowser {
 
             await Promise.all([...imagePromises, ...videoPromises]);
 
-            // Hydrate Clips
             // @ts-ignore
             window.activeClips = clipList.map(c => ({
                 ...c,
                 fn: new Function('return ' + c.drawFunction)()
             })).sort((a, b) => a.zIndex - b.zIndex);
 
-            // Render Loop
             // @ts-ignore
             window.renderFrame = async (frame, fps, totalFrames) => {
                 const canvas = document.getElementById('stage') as HTMLCanvasElement;
                 const ctx = canvas.getContext('2d')!;
                 const currentTime = frame / fps;
 
-                // Sync Videos
                 // @ts-ignore
                 const videoSyncPromises = Object.values(window.loadedVideos).map((vid: HTMLVideoElement) => {
                     return new Promise(resolve => {
@@ -115,7 +110,6 @@ export class TiramisuBrowser {
 
                 ctx.clearRect(0, 0, w, h);
                 
-                // Retrieve Audio Volume for this frame
                 const currentVolume = levels[frame] || 0;
 
                 // @ts-ignore
@@ -129,7 +123,6 @@ export class TiramisuBrowser {
                             progress: frame / (totalFrames - 1 || 1),
                             localFrame,
                             localProgress: localFrame / (duration - 1 || 1),
-                            // Inject Audio
                             audioVolume: currentVolume,
                             ctx,
                             canvas,
