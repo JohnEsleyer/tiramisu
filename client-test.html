@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tiramisu Client Live Preview Test</title>
+    <style>
+        body { background: #333; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        canvas { box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); }
+    </style>
+</head>
+<body>
+    <!-- The canvas element with the ID referenced in client-test.ts -->
+    <canvas id="preview-canvas"></canvas>
+
+    <!-- 
+      For a real-world application, you would need to bundle 
+      your TypeScript into a single JavaScript file (e.g., using `bun build`).
+      
+      For this test, we assume a build step:
+      e.g., `bun build ./client-test.ts --target browser --outfile ./dist/client-test.js`
+    -->
+    <script type="module" src="./client-test.js"></script>
+    
+    <!-- 
+      Note: If you are using a modern version of Bun and a simple 
+      local file server, you might be able to reference `./client-test.ts` 
+      directly if Bun's dev server handles the transpilation on the fly.
+    -->
+</body>
+</html>

@@ -1,9 +1,8 @@
 import { Tiramisu } from "./src/Tiramisu";
 export * from "./src/types";
-export { BROWSER_UTILS_CODE } from "./src/Utils";
+export { BROWSER_UTILS_CODE, TiramisuUtils } from "./src/Utils";
+export { TiramisuPlayer } from "./src/Client";
 
-// Named export: import { Tiramisu } from "tiramisu"
+// Server-side Engine
 export { Tiramisu };
-
-// Default export: import Tiramisu from "tiramisu"
 export default Tiramisu;
