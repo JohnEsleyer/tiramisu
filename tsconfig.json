@@ -1,16 +1,19 @@
 {
   "compilerOptions": {
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "target": "ESNext",
-    "module": "ESNext",
+    "module": "esnext",
+    "target": "esnext",
     "moduleResolution": "bundler",
     "moduleDetection": "force",
     "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
     "noEmit": true,
     "strict": true,
     "skipLibCheck": true,
     "allowJs": true,
-    "types": ["bun-types", "node"]
-  }
+    // Add "bun" to types to fix 'Cannot find name Bun'
+    // Add "node" to fix 'node:fs/promises'
+    "types": ["bun", "node"] 
+  },
+  // Ensure the examples folder is included in linting
+  "include": ["src", "examples"]
 }
