@@ -1,39 +1,37 @@
 /**
- * This code is injected into the browser context.
- * It provides helper functions for animations.
+ * Utility functions available to both the Server (Puppeteer) and Client (Browser).
  */
-export const BROWSER_UTILS_CODE = `
-window.TiramisuUtils = {
+export const TiramisuUtils = {
     // --- Math Helpers ---
-    lerp: (start, end, t) => start * (1 - t) + end * t,
+    lerp: (start: number, end: number, t: number) => start * (1 - t) + end * t,
     
-    clamp: (val, min, max) => Math.min(Math.max(val, min), max),
+    clamp: (val: number, min: number, max: number) => Math.min(Math.max(val, min), max),
     
-    remap: (value, low1, high1, low2, high2) => {
+    remap: (value: number, low1: number, high1: number, low2: number, high2: number) => {
         return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
     },
 
-    toRad: (deg) => deg * (Math.PI / 180),
+    toRad: (deg: number) => deg * (Math.PI / 180),
 
     // --- Easing Functions (t is 0-1) ---
-    easeInQuad: (t) => t * t,
-    easeOutQuad: (t) => t * (2 - t),
-    easeInOutQuad: (t) => t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+    easeInQuad: (t: number) => t * t,
+    easeOutQuad: (t: number) => t * (2 - t),
+    easeInOutQuad: (t: number) => t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
     
-    easeInCubic: (t) => t * t * t,
-    easeOutCubic: (t) => (--t) * t * t + 1,
+    easeInCubic: (t: number) => t * t * t,
+    easeOutCubic: (t: number) => (--t) * t * t + 1,
     
-    easeInElastic: (t) => {
+    easeInElastic: (t: number) => {
         if (t===0) return 0;  if (t===1) return 1;
         return -Math.pow(2, 10 * (t - 1)) * Math.sin((t - 1 - 0.3 / 4) * (2 * Math.PI) / 0.3);
     },
     
-    easeOutElastic: (t) => {
+    easeOutElastic: (t: number) => {
         if (t===0) return 0;  if (t===1) return 1;
         return Math.pow(2, -10 * t) * Math.sin((t - 0.3 / 4) * (2 * Math.PI) / 0.3) + 1;
     },
     
-    easeOutBounce: (t) => {
+    easeOutBounce: (t: number) => {
         const n1 = 7.5625;
         const d1 = 2.75;
         if (t < 1 / d1) {
@@ -49,11 +47,7 @@ window.TiramisuUtils = {
 
     // --- Canvas Helpers ---
     
-    /**
-     * Draws a rounded rectangle path.
-     * Note: You must call ctx.fill() or ctx.stroke() after this.
-     */
-    drawRoundedRect: (ctx, x, y, w, h, r) => {
+    drawRoundedRect: (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
         if (w < 2 * r) r = w / 2;
         if (h < 2 * r) r = h / 2;
         ctx.beginPath();
@@ -65,11 +59,7 @@ window.TiramisuUtils = {
         ctx.closePath();
     },
 
-    /**
-     * Draws text wrapped within a specific width.
-     * Returns the final Y position.
-     */
-    drawParagraph: (ctx, text, x, y, maxWidth, lineHeight) => {
+    drawParagraph: (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
         const words = text.split(' ');
         let line = '';
         let currentY = y;
@@ -90,5 +80,27 @@ window.TiramisuUtils = {
         ctx.fillText(line, x, currentY);
         return currentY + lineHeight;
     }
+};
+
+/**
+ * Injected into Puppeteer page context. 
+ * We stringify functions to ensure they are available in the headless browser.
+ */
+export const BROWSER_UTILS_CODE = `
+window.TiramisuUtils = {
+    lerp: ${TiramisuUtils.lerp.toString()},
+    clamp: ${TiramisuUtils.clamp.toString()},
+    remap: ${TiramisuUtils.remap.toString()},
+    toRad: ${TiramisuUtils.toRad.toString()},
+    easeInQuad: ${TiramisuUtils.easeInQuad.toString()},
+    easeOutQuad: ${TiramisuUtils.easeOutQuad.toString()},
+    easeInOutQuad: ${TiramisuUtils.easeInOutQuad.toString()},
+    easeInCubic: ${TiramisuUtils.easeInCubic.toString()},
+    easeOutCubic: ${TiramisuUtils.easeOutCubic.toString()},
+    easeInElastic: ${TiramisuUtils.easeInElastic.toString()},
+    easeOutElastic: ${TiramisuUtils.easeOutElastic.toString()},
+    easeOutBounce: ${TiramisuUtils.easeOutBounce.toString()},
+    drawRoundedRect: ${TiramisuUtils.drawRoundedRect.toString()},
+    drawParagraph: ${TiramisuUtils.drawParagraph.toString()}
 };
 `;

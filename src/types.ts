@@ -7,8 +7,8 @@ export interface RenderConfig<T = any> {
     fps: number;
     /** Total video length in seconds */
     durationSeconds: number;
-    /** Path to the output .mp4 file */
-    outputFile: string;
+    /** Path to the output .mp4 file (Server only) */
+    outputFile?: string;
     
     // Optional Fields
     /** Run Puppeteer in headless mode (default: true) */
@@ -23,6 +23,8 @@ export interface RenderConfig<T = any> {
     fonts?: { name: string, url: string }[];
     /** Custom state/data accessible in every draw call */
     data?: T;
+    /** DOM Canvas Element or ID (Client only) */
+    canvas?: HTMLCanvasElement | string;
 }
 
 export interface RenderContext<T = any> {
@@ -39,7 +41,7 @@ export interface RenderContext<T = any> {
     data: T;
     assets: Record<string, HTMLImageElement>;
     videos: Record<string, HTMLVideoElement>;
-    utils: any;
+    utils: typeof import("./Utils").TiramisuUtils;
 }
 
 export type DrawFunction<T = any> = (context: RenderContext<T>) => void;
@@ -49,5 +51,5 @@ export interface Clip<T = any> {
     startFrame: number;
     endFrame: number;
     zIndex: number;
-    drawFunction: string;
+    drawFunction: string | DrawFunction<T>;
 }
