@@ -6,10 +6,17 @@
   "types": "index.ts",
   "type": "module",
   "scripts": {
-    "build:editor": "bun build ./examples/video-editor/app.ts --target browser --outfile ./examples/video-editor/editor-bundle.js --external \"../../src/Tiramisu\" --external \"../../src/Server\" --external \"../../src/Browser\" --external \"../../src/Encoder\" --external \"../../src/CLI\" --external \"../../src/AudioAnalysis\" --external \"puppeteer\"",
+    "BASE_EXTERNAL": "--external \"./src/Tiramisu\" --external \"./src/Server\" --external \"./src/Browser\" --external \"./src/Encoder\" --external \"./src/CLI\" --external \"./src/AudioAnalysis\" --external \"puppeteer\"",
+
+    "build": "bun build ./index.ts --target bun --outfile ./dist/tiramisu.js",
+    
+    "build:editor": "bun build ./examples/video-editor/app.ts --target browser --outfile ./examples/video-editor/editor-bundle.js $BASE_EXTERNAL",
     "dev:editor": "bun run build:editor && bun run examples/serve.ts",
-    "build:upload": "bun build ./examples/video-upload/app.ts --target browser --outfile ./examples/video-upload/bundle.js --external \"../../src/Tiramisu\" --external \"../../src/Server\" --external \"../../src/Browser\" --external \"../../src/Encoder\" --external \"../../src/CLI\" --external \"../../src/AudioAnalysis\" --external \"puppeteer\"",
-    "dev:upload": "bun run build:upload && bun run examples/serve.ts"
+    
+    "build:upload": "bun build ./examples/video-upload/app.ts --target browser --outfile ./examples/video-upload/bundle.js $BASE_EXTERNAL",
+    "dev:upload": "bun run build:upload && bun run examples/serve.ts",
+
+    "start:server": "bun run examples/serve.ts"
   },
   "dependencies": {
     "puppeteer": "^24.36.1"
@@ -17,5 +24,13 @@
   "devDependencies": {
     "@types/bun": "^1.3.8",
     "@types/node": "^25.2.0"
+  },
+  "exports": {
+    ".": {
+      "import": "./index.ts"
+    },
+    "./client": {
+      "import": "./src/Client.ts"
+    }
   }
 }
