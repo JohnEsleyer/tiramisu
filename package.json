@@ -7,7 +7,9 @@
   "type": "module",
   "scripts": {
     "build:editor": "bun build ./examples/video-editor/app.ts --target browser --outfile ./examples/video-editor/editor-bundle.js --external \"../../src/Tiramisu\" --external \"../../src/Server\" --external \"../../src/Browser\" --external \"../../src/Encoder\" --external \"../../src/CLI\" --external \"../../src/AudioAnalysis\" --external \"puppeteer\"",
-    "dev:editor": "bun run build:editor && bun run examples/serve.ts"
+    "dev:editor": "bun run build:editor && bun run examples/serve.ts",
+    "build:upload": "bun build ./examples/video-upload/app.ts --target browser --outfile ./examples/video-upload/bundle.js --external \"../../src/Tiramisu\" --external \"../../src/Server\" --external \"../../src/Browser\" --external \"../../src/Encoder\" --external \"../../src/CLI\" --external \"../../src/AudioAnalysis\" --external \"puppeteer\"",
+    "dev:upload": "bun run build:upload && bun run examples/serve.ts"
   },
   "dependencies": {
     "puppeteer": "^24.36.1"

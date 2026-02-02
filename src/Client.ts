@@ -54,6 +54,13 @@ export class TiramisuPlayer<T = any> {
     public async load() {
         console.log("🍰 Tiramisu Client: Loading assets...");
 
+        // Clear previous instances if load is called again.
+        this.loadedAssets = {};
+
+        // Properly remove old video elements from DOM
+        Object.values(this.loadedVideos).forEach(v => v.remove());
+        this.loadedVideos = {};
+
         // Load Images
         if (this.config.assets) {
             const promises = this.config.assets.map(src => new Promise<void>((resolve) => {
@@ -68,7 +75,7 @@ export class TiramisuPlayer<T = any> {
 
         // Load Videos
         if (this.config.videos) {
-            const promises = this.config.videos.map(src => new Promise<void>((resolve) => {
+               const promises = this.config.videos.map(src => new Promise<void>((resolve) => {
                 const vid = document.createElement("video");
                 vid.crossOrigin = "Anonymous";
                 vid.src = src;
@@ -77,8 +84,16 @@ export class TiramisuPlayer<T = any> {
                 vid.style.display = "none";
                 vid.preload = "auto";
                 document.body.appendChild(vid);
-                vid.onloadeddata = () => { this.loadedVideos[src] = vid; resolve(); };
-                vid.onerror = () => { console.warn(`Failed to load ${src}`); resolve(); };
+                
+                // Use 'canplaythrough' to ensure we have enough data
+                vid.oncanplaythrough = () => { 
+                    this.loadedVideos[src] = vid; 
+                    resolve(); 
+                };
+                vid.onerror = () => { 
+                    console.warn(`Failed to load ${src}`); 
+                    resolve(); 
+                };
             }));
             await Promise.all(promises);
         }
@@ -138,21 +153,17 @@ export class TiramisuPlayer<T = any> {
     public pause() {
         if (!this.isPlaying) return;
         this.isPlaying = false;
-        
         if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+        
+        // Pause all videos
+        Object.values(this.loadedVideos).forEach(v => v.pause());
 
         if (this.audioSource) {
             this.audioSource.stop();
             this.audioSource.disconnect();
             this.audioSource = null;
         }
-
-        // Save position
-        if (this.audioContext) {
-            this.pausedAt = this.audioContext.currentTime - this.startTime;
-        } else {
-            this.pausedAt = (performance.now() / 1000) - this.startTime;
-        }
+        this.pausedAt = this.audioContext ? (this.audioContext.currentTime - this.startTime) : ((performance.now() / 1000) - this.startTime);
     }
 
     public seek(timeSeconds: number) {
@@ -206,28 +217,35 @@ export class TiramisuPlayer<T = any> {
         const progress = frame / (totalFrames - 1 || 1);
         const volume = this.getAudioVolume();
 
-        this.ctx.clearRect(0, 0, this.config.width, this.config.height);
-
-        // Sync Videos
-        const currentTime = frame / this.config.fps;
+        // 1. Sync Videos
+        const targetTime = frame / this.config.fps;
         Object.values(this.loadedVideos).forEach(vid => {
-            if (Math.abs(vid.currentTime - currentTime) > 0.1) {
-                vid.currentTime = currentTime; 
+            if (this.isPlaying) {
+                if (vid.paused) vid.play().catch(() => {});
+                const drift = Math.abs(vid.currentTime - targetTime);
+                if (drift > 0.2) vid.currentTime = targetTime;
+            } else {
+                if (!vid.paused) vid.pause();
+                // Avoid "Seek Storms": only seek if not already seeking
+                if (!vid.seeking && Math.abs(vid.currentTime - targetTime) > 0.01) {
+                    vid.currentTime = targetTime;
+                }
             }
         });
 
+        // 2. Clear Canvas
+        // We clear the canvas, but our clips will now handle their own persistence.
+        this.ctx.clearRect(0, 0, this.config.width, this.config.height);
+
+        // 3. Draw Clips
         for (const clip of this.clips) {
             if (frame >= clip.startFrame && frame < clip.endFrame) {
-                const localFrame = frame - clip.startFrame;
-                const duration = clip.endFrame - clip.startFrame;
-                const localProgress = localFrame / (duration - 1 || 1);
-
                 if (typeof clip.drawFunction === 'function') {
                     clip.drawFunction({
                         frame,
                         progress,
-                        localFrame,
-                        localProgress,
+                        localFrame: frame - clip.startFrame,
+                        localProgress: (frame - clip.startFrame) / (clip.endFrame - clip.startFrame - 1 || 1),
                         audioVolume: volume,
                         ctx: this.ctx,
                         canvas: this.canvas,
