@@ -44,15 +44,18 @@ export class TiramisuPlayer<T = any> {
             startFrame,
             endFrame,
             zIndex,
-            drawFunction: fn // Store the raw function for client execution
+            drawFunction: fn
         });
 
-        // Sort by zIndex immediately
         this.clips.sort((a, b) => a.zIndex - b.zIndex);
     }
 
     public async load() {
         console.log("🍰 Tiramisu Client: Loading assets...");
+
+        this.loadedAssets = {};
+        Object.values(this.loadedVideos).forEach(v => v.remove());
+        this.loadedVideos = {};
 
         // Load Images
         if (this.config.assets) {
@@ -68,17 +71,26 @@ export class TiramisuPlayer<T = any> {
 
         // Load Videos
         if (this.config.videos) {
-            const promises = this.config.videos.map(src => new Promise<void>((resolve) => {
+               const promises = this.config.videos.map(src => new Promise<void>((resolve) => {
                 const vid = document.createElement("video");
                 vid.crossOrigin = "Anonymous";
                 vid.src = src;
                 vid.muted = true;
                 vid.playsInline = true;
                 vid.style.display = "none";
-                vid.preload = "auto";
+                vid.preload = "auto"; 
                 document.body.appendChild(vid);
-                vid.onloadeddata = () => { this.loadedVideos[src] = vid; resolve(); };
-                vid.onerror = () => { console.warn(`Failed to load ${src}`); resolve(); };
+                
+                // CHANGE: Use 'onloadeddata' (fires when frame 1 is ready) instead of 'oncanplaythrough'
+                // This is much more reliable for local blobs and short loops.
+                vid.onloadeddata = () => { 
+                    this.loadedVideos[src] = vid; 
+                    resolve(); 
+                };
+                vid.onerror = (e) => { 
+                    console.warn(`Failed to load video ${src}`, e); 
+                    resolve(); 
+                };
             }));
             await Promise.all(promises);
         }
@@ -99,17 +111,21 @@ export class TiramisuPlayer<T = any> {
 
         // Load Audio
         if (this.config.audioFile) {
-            this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const response = await fetch(this.config.audioFile);
-            const arrayBuffer = await response.arrayBuffer();
-            this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-            
-            this.audioAnalyser = this.audioContext.createAnalyser();
-            this.audioAnalyser.fftSize = 256;
+            try {
+                this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+                const response = await fetch(this.config.audioFile);
+                const arrayBuffer = await response.arrayBuffer();
+                this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+                
+                this.audioAnalyser = this.audioContext.createAnalyser();
+                this.audioAnalyser.fftSize = 256;
+            } catch (e) {
+                console.error("Failed to load audio file", e);
+            }
         }
 
         console.log("🍰 Tiramisu Client: Ready.");
-        // Render first frame
+        // Render first frame immediately
         this.renderFrame(0);
     }
 
@@ -124,7 +140,6 @@ export class TiramisuPlayer<T = any> {
             this.audioSource.connect(this.audioAnalyser!);
             this.audioAnalyser!.connect(this.audioContext.destination);
             
-            // Handle seeking offset
             const offset = this.pausedAt;
             this.startTime = this.audioContext.currentTime - offset;
             this.audioSource.start(0, offset);
@@ -138,26 +153,22 @@ export class TiramisuPlayer<T = any> {
     public pause() {
         if (!this.isPlaying) return;
         this.isPlaying = false;
-        
         if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+        
+        Object.values(this.loadedVideos).forEach(v => v.pause());
 
         if (this.audioSource) {
             this.audioSource.stop();
             this.audioSource.disconnect();
             this.audioSource = null;
         }
-
-        // Save position
-        if (this.audioContext) {
-            this.pausedAt = this.audioContext.currentTime - this.startTime;
-        } else {
-            this.pausedAt = (performance.now() / 1000) - this.startTime;
-        }
+        this.pausedAt = this.audioContext ? (this.audioContext.currentTime - this.startTime) : ((performance.now() / 1000) - this.startTime);
     }
 
     public seek(timeSeconds: number) {
         this.pausedAt = TiramisuUtils.clamp(timeSeconds, 0, this.config.durationSeconds);
         if (this.isPlaying) {
+            // If playing, we need to restart the audio source to seek
             this.pause();
             this.play();
         } else {
@@ -178,7 +189,8 @@ export class TiramisuPlayer<T = any> {
 
         if (currentTime >= this.config.durationSeconds) {
             this.pause();
-            this.pausedAt = 0; // Loop or Stop? Let's stop.
+            this.pausedAt = 0;
+            // Optionally loop: this.play();
             return;
         }
 
@@ -198,36 +210,43 @@ export class TiramisuPlayer<T = any> {
             const x = (dataArray[i] - 128) / 128.0;
             sum += x * x;
         }
-        return Math.sqrt(sum / dataArray.length) * 2; // Approximate RMS normalized
+        return Math.sqrt(sum / dataArray.length) * 2;
     }
 
-    private renderFrame(frame: number) {
+    // Public render method for forcing updates
+    public renderFrame(frame: number) {
         const totalFrames = Math.ceil(this.config.fps * this.config.durationSeconds);
         const progress = frame / (totalFrames - 1 || 1);
         const volume = this.getAudioVolume();
 
-        this.ctx.clearRect(0, 0, this.config.width, this.config.height);
-
         // Sync Videos
-        const currentTime = frame / this.config.fps;
+        const targetTime = frame / this.config.fps;
         Object.values(this.loadedVideos).forEach(vid => {
-            if (Math.abs(vid.currentTime - currentTime) > 0.1) {
-                vid.currentTime = currentTime; 
+            if (this.isPlaying) {
+                if (vid.paused) vid.play().catch(() => {});
+                const drift = Math.abs(vid.currentTime - targetTime);
+                if (drift > 0.2) vid.currentTime = targetTime;
+            } else {
+                if (!vid.paused) vid.pause();
+                // Loose sync when paused to prevent jitter
+                if (!vid.seeking && Math.abs(vid.currentTime - targetTime) > 0.05) {
+                    vid.currentTime = targetTime;
+                }
             }
         });
 
-        for (const clip of this.clips) {
-            if (frame >= clip.startFrame && frame < clip.endFrame) {
-                const localFrame = frame - clip.startFrame;
-                const duration = clip.endFrame - clip.startFrame;
-                const localProgress = localFrame / (duration - 1 || 1);
+        this.ctx.clearRect(0, 0, this.config.width, this.config.height);
 
+        for (const clip of this.clips) {
+            // Draw clip if frame is within range (inclusive start, exclusive end)
+            // Note: We're expanding the range check slightly for safety
+            if (frame >= clip.startFrame && frame < clip.endFrame) {
                 if (typeof clip.drawFunction === 'function') {
                     clip.drawFunction({
                         frame,
                         progress,
-                        localFrame,
-                        localProgress,
+                        localFrame: frame - clip.startFrame,
+                        localProgress: (frame - clip.startFrame) / (clip.endFrame - clip.startFrame - 1 || 1),
                         audioVolume: volume,
                         ctx: this.ctx,
                         canvas: this.canvas,

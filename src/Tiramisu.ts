@@ -3,25 +3,21 @@ import { TiramisuBrowser } from './Browser';
 import { TiramisuEncoder } from './Encoder';
 import { TiramisuCLI } from './CLI';
 import { AudioAnalyzer } from './AudioAnalysis';
+import { VideoManager } from './VideoManager';
 import type { RenderConfig, DrawFunction, Clip } from './types';
 
 export class Tiramisu<T = any> {
     private config: RenderConfig<T>;
     private clips: Clip[] = [];
 
-    constructor(config: RenderConfig<T>) {
-        this.config = { headless: true, ...config };
-    }
+    constructor(config: RenderConfig<T>) { this.config = { headless: true, ...config }; }
 
-    public addClip(startSeconds: number, durationSeconds: number, fn: DrawFunction<T>, zIndex: number = 0) {
-        const startFrame = Math.floor(startSeconds * this.config.fps);
-        const endFrame = startFrame + Math.floor(durationSeconds * this.config.fps);
-
+    public addClip(start: number, dur: number, fn: DrawFunction<T>, z: number = 0) {
         this.clips.push({
             id: crypto.randomUUID(),
-            startFrame,
-            endFrame,
-            zIndex,
+            startFrame: Math.floor(start * this.config.fps),
+            endFrame: Math.floor((start + dur) * this.config.fps),
+            zIndex: z,
             drawFunction: fn.toString()
         });
     }
@@ -30,30 +26,40 @@ export class Tiramisu<T = any> {
         const { width, height, fps, durationSeconds, outputFile, audioFile, data, headless } = this.config;
         const totalFrames = Math.ceil(fps * durationSeconds);
 
+        const videoManager = new VideoManager();
+        const videoFrameMaps: Record<string, { folder: string, count: number }> = {};
+        
+        if (this.config.videos) {
+            for (const path of this.config.videos) {
+                const fsPath = path.startsWith('/') ? path.slice(1) : path;
+                const result = await videoManager.extractFrames(fsPath, fps);
+                videoFrameMaps[path] = result;
+            }
+        }
+
         const server = new TiramisuServer();
         const browser = new TiramisuBrowser();
+        const encoder = new TiramisuEncoder(fps, outputFile!, audioFile);
         const cli = new TiramisuCLI(totalFrames);
-        const analyzer = new AudioAnalyzer();
+        const audioLevels = audioFile ? await new AudioAnalyzer().analyze(audioFile, fps, durationSeconds) : [];
 
-        let audioLevels: number[] = [];
-        if (audioFile) audioLevels = await analyzer.analyze(audioFile, fps, durationSeconds);
-        
         const url = server.start();
         await browser.init(width, height, headless ?? true);
-        await browser.setupScene(url, this.clips, width, height, data || {}, [], [], [], audioLevels);
+        await browser.setupScene(url, this.clips, width, height, data || {}, this.config.assets || [], Object.keys(videoFrameMaps), audioLevels);
 
-        const encoder = new TiramisuEncoder(fps, outputFile, audioFile);
         cli.start();
-
         for (let i = 0; i < totalFrames; i++) {
-            const frameBuffer = await browser.renderFrame(i, fps, totalFrames);
-            await encoder.writeFrame(frameBuffer);
+            const vMap: Record<string, string> = {};
+            for (const [key, info] of Object.entries(videoFrameMaps)) {
+                const idx = (i % info.count) + 1;
+                vMap[key] = `/${info.folder}/frame_${idx.toString().padStart(5, '0')}.jpg`;
+            }
+            const buffer = await browser.renderFrame(i, fps, totalFrames, vMap);
+            await encoder.writeFrame(buffer);
             cli.update(i + 1);
         }
 
-        await encoder.close();
-        await browser.close();
-        server.stop();
-        cli.finish(outputFile);
+        await encoder.close(); await browser.close(); server.stop();
+        cli.finish(outputFile!);
     }
 }
