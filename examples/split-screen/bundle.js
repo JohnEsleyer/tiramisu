@@ -1,4 +1,12 @@
 // src/Utils.ts
+var mulberry32 = (a) => {
+  return function() {
+    let t = a += 1831565813;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+};
 var TiramisuUtils = {
   lerp: (start, end, t) => start * (1 - t) + end * t,
   clamp: (val, min, max) => Math.min(Math.max(val, min), max),
@@ -23,6 +31,7 @@ var TiramisuUtils = {
     else
       return n1 * (t -= 2.625 / d1) * t + 0.984375;
   },
+  seededRandomGenerator: (seed) => mulberry32(seed),
   drawRoundedRect: (ctx, x, y, w, h, r) => {
     if (w < 2 * r)
       r = w / 2;
@@ -36,11 +45,39 @@ var TiramisuUtils = {
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
   },
+  drawMediaFit: (ctx, media, targetW, targetH) => {
+    if (!media)
+      return;
+    let sw = 0, sh = 0;
+    if (media instanceof HTMLVideoElement) {
+      sw = media.videoWidth;
+      sh = media.videoHeight;
+    } else if (media instanceof HTMLImageElement) {
+      sw = media.naturalWidth || media.width;
+      sh = media.naturalHeight || media.height;
+    }
+    if (sw === 0 || sh === 0)
+      return;
+    const targetRatio = targetW / targetH;
+    const sourceRatio = sw / sh;
+    let dw, dh, dx, dy;
+    if (sourceRatio > targetRatio) {
+      dw = targetW;
+      dh = targetW / sourceRatio;
+      dx = 0;
+      dy = (targetH - dh) / 2;
+    } else {
+      dh = targetH;
+      dw = targetH * sourceRatio;
+      dx = (targetW - dw) / 2;
+      dy = 0;
+    }
+    ctx.drawImage(media, dx, dy, dw, dh);
+  },
   drawMediaCover: (ctx, media, targetW, targetH) => {
     if (!media)
       return;
-    let sw = 0;
-    let sh = 0;
+    let sw = 0, sh = 0;
     if (media instanceof HTMLVideoElement) {
       sw = media.videoWidth;
       sh = media.videoHeight;
@@ -65,9 +102,22 @@ var TiramisuUtils = {
       dy = (targetH - dh) / 2;
     }
     ctx.drawImage(media, dx, dy, dw, dh);
+  },
+  drawMasked: (ctx, contentFn, maskFn) => {
+    const { width, height } = ctx.canvas;
+    const buffer = document.createElement("canvas");
+    buffer.width = width;
+    buffer.height = height;
+    const bCtx = buffer.getContext("2d");
+    maskFn(bCtx);
+    bCtx.globalCompositeOperation = "source-in";
+    contentFn(bCtx);
+    ctx.drawImage(buffer, 0, 0);
   }
 };
 var BROWSER_UTILS_CODE = `
+const mulberry32 = ${mulberry32.toString()};
+
 window.TiramisuUtils = {
     lerp: ${TiramisuUtils.lerp.toString()},
     clamp: ${TiramisuUtils.clamp.toString()},
@@ -79,8 +129,12 @@ window.TiramisuUtils = {
     easeInCubic: ${TiramisuUtils.easeInCubic.toString()},
     easeOutCubic: ${TiramisuUtils.easeOutCubic.toString()},
     easeOutBounce: ${TiramisuUtils.easeOutBounce.toString()},
+    // Pass the generator function creator for deterministic randomness
+    seededRandomGenerator: mulberry32, 
     drawRoundedRect: ${TiramisuUtils.drawRoundedRect.toString()},
-    drawMediaCover: ${TiramisuUtils.drawMediaCover.toString()}
+    drawMediaFit: ${TiramisuUtils.drawMediaFit.toString()},
+    drawMediaCover: ${TiramisuUtils.drawMediaCover.toString()},
+    drawMasked: ${TiramisuUtils.drawMasked.toString()}
 };
 `;
 
@@ -186,7 +240,7 @@ class TiramisuPlayer {
         const arrayBuffer = await response.arrayBuffer();
         this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
         this.audioAnalyser = this.audioContext.createAnalyser();
-        this.audioAnalyser.fftSize = 256;
+        this.audioAnalyser.fftSize = 64;
       } catch (e) {
         console.error("Failed to load audio file", e);
       }
@@ -267,10 +321,19 @@ class TiramisuPlayer {
     }
     return Math.sqrt(sum / dataArray.length) * 2;
   }
+  getAudioBands(count = 32) {
+    if (!this.audioAnalyser)
+      return Array(count).fill(0);
+    const dataArray = new Uint8Array(this.audioAnalyser.frequencyBinCount);
+    this.audioAnalyser.getByteFrequencyData(dataArray);
+    const bins = Array.from(dataArray.slice(0, count));
+    return bins.map((v) => v / 255);
+  }
   renderFrame(frame) {
     const totalFrames = Math.ceil(this.config.fps * this.config.durationSeconds);
     const progress = frame / (totalFrames - 1 || 1);
     const volume = this.getAudioVolume();
+    const bands = this.getAudioBands(32);
     const targetTime = frame / this.config.fps;
     Object.values(this.loadedVideos).forEach((vid) => {
       if (this.isPlaying) {
@@ -297,6 +360,7 @@ class TiramisuPlayer {
             localFrame: frame - clip.startFrame,
             localProgress: (frame - clip.startFrame) / (clip.endFrame - clip.startFrame - 1 || 1),
             audioVolume: volume,
+            audioBands: bands,
             ctx: this.ctx,
             canvas: this.canvas,
             width: this.config.width,
