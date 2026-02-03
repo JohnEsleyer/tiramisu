@@ -6,6 +6,7 @@ out
 dist
 *.tgz
 *.mp4
+*.jpg
 
 # code coverage
 coverage
