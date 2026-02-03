@@ -32,7 +32,10 @@ export interface RenderContext<T = any> {
     progress: number;
     localFrame: number;
     localProgress: number;
+    /** Normalized RMS volume (0-1) - from AudioAnalysis on server, or WebAudio on client. */
     audioVolume: number;
+    /** Array of normalized frequency magnitudes (e.g., 32 bins, 0-1) - Client only/placeholder on server. */
+    audioBands: number[]; // <-- NEW FIELD
     ctx: CanvasRenderingContext2D;
     canvas: HTMLCanvasElement;
     width: number;

@@ -1,15 +1,23 @@
 import { spawn } from "bun";
 import { mkdir, readdir } from "node:fs/promises";
-import { join, basename } from "node:path";
+import { join, basename, isAbsolute } from "node:path";
+import { existsSync } from "node:fs";
 
 export class VideoManager {
     private cacheDir = ".tiramisu-cache";
 
     public async extractFrames(videoPath: string, fps: number): Promise<{ folder: string, count: number }> {
-        const file = Bun.file(videoPath);
+        // Resolve absolute path
+        const absolutePath = isAbsolute(videoPath) ? videoPath : join(process.cwd(), videoPath);
+
+        if (!existsSync(absolutePath)) {
+            console.error(`   ❌ VideoManager Error: Input file does not exist at path: ${absolutePath}`);
+            throw new Error("Video file not found for frame extraction.");
+        }
+        
+        const file = Bun.file(absolutePath);
         const stats = await file.stat();
         
-        // ID depends on Filename + Size + FPS
         const videoId = [
             basename(videoPath).replace(/[^a-z0-9]/gi, '_'),
             stats.size,
@@ -25,20 +33,28 @@ export class VideoManager {
             return { folder: outputDir, count: files.filter(f => f.endsWith(".jpg")).length };
         }
 
-        console.log(`   🔨 Extracting: ${basename(videoPath)} (${stats.size} bytes)`);
+        console.log(`   🔨 Extracting: ${basename(videoPath)} to ${outputDir}`);
         await mkdir(outputDir, { recursive: true });
 
-        const proc = spawn([
-            "ffmpeg", "-y", "-i", videoPath,
+        const ffmpegArgs = [
+            "ffmpeg", "-y", 
+            "-i", absolutePath, 
             "-vf", `fps=${fps}`,
-            "-q:v", "2", 
+            "-qscale:v", "1", 
             join(outputDir, "frame_%05d.jpg")
-        ], { stdout: "ignore", stderr: "ignore" });
+        ];
 
+        const proc = spawn(ffmpegArgs, { stdout: "ignore", stderr: "inherit" });
         await proc.exited;
+        
+        const tempFiles = await readdir(outputDir);
+        const frameCount = tempFiles.filter(f => f.endsWith(".jpg")).length;
+        
+        if (frameCount === 0) {
+             throw new Error("FFmpeg failed to extract video frames.");
+        }
+        
         await Bun.write(join(outputDir, "done.marker"), "done");
-
-        const files = await readdir(outputDir);
-        return { folder: outputDir, count: files.filter(f => f.endsWith(".jpg")).length };
+        return { folder: outputDir, count: frameCount };
     }
 }

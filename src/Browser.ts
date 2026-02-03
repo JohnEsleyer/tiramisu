@@ -17,7 +17,7 @@ export class TiramisuBrowser {
 
     public async setupScene(
         url: string, clips: Clip[], width: number, height: number, 
-        data: any, assets: string[], videoKeys: string[], audioLevels: number[]
+        data: any, assets: string[], videoKeys: string[], audioLevels: { rms: number }[] // <-- Audio levels is now an object array
     ) {
         if (!this.page) return;
         await this.page.goto(url);
@@ -47,15 +47,36 @@ export class TiramisuBrowser {
                 ...c, fn: new Function('return ' + c.drawFunction)()
             })).sort((a: any, b: any) => a.zIndex - b.zIndex);
 
-            win.renderFrame = async (frame: number, fps: number, totalFrames: number, vMap: Record<string, string>) => {
+            win.audioData = levels; // store the analyzed RMS data from server
+
+            win.renderFrame = async (frame: number, fps: number, totalFrames: number, vMap: Record<string, string>, rms: number, bands: number[]) => {
                 const ctx = canvas.getContext('2d')!;
+                
+                // --- CRITICAL CHANGE: ADDING ERROR HANDLER TO IMAGE LOADS ---
                 await Promise.all(Object.entries(vMap).map(([key, path]) => {
                     return new Promise(res => {
                         const img = win.loadedVideos[key];
-                        if (img.src.includes(path)) return res(null);
-                        img.onload = () => res(null); img.src = path;
+                        // If src is already correct, resolve immediately
+                        if (img.src.includes(path)) return res(null); 
+                        
+                        const onError = () => { 
+                            console.error(`[Puppeteer] FAILED to load frame image: ${path}`);
+                            img.removeEventListener('load', onLoad);
+                            res(null); // Resolve to prevent render hang, even on failure
+                        };
+                        
+                        const onLoad = () => { 
+                            img.removeEventListener('error', onError); // Cleanup
+                            res(null); 
+                        };
+                        
+                        img.onload = onLoad;
+                        img.onerror = onError;
+                        
+                        img.src = path;
                     });
                 }));
+                // --- END CRITICAL CHANGE ---
 
                 ctx.clearRect(0, 0, w, h);
                 for (const clip of win.activeClips) {
@@ -64,7 +85,8 @@ export class TiramisuBrowser {
                             frame, ctx, canvas, width: w, height: h, fps,
                             progress: frame / (totalFrames - 1 || 1),
                             localProgress: (frame - clip.startFrame) / (clip.endFrame - clip.startFrame - 1 || 1),
-                            audioVolume: levels[frame] || 0,
+                            audioVolume: rms, 
+                            audioBands: bands, 
                             data: injectedData, assets: win.loadedAssets, videos: win.loadedVideos, utils: win.TiramisuUtils
                         });
                     }
@@ -73,10 +95,10 @@ export class TiramisuBrowser {
         }, clips, width, height, data, assets, videoKeys, audioLevels);
     }
 
-    public async renderFrame(frame: number, fps: number, totalFrames: number, vMap: Record<string, string>): Promise<Uint8Array> {
-        await this.page!.evaluate(async (f, r, tf, vm) => {
-            await (window as any).renderFrame(f, r, tf, vm);
-        }, frame, fps, totalFrames, vMap);
+    public async renderFrame(frame: number, fps: number, totalFrames: number, vMap: Record<string, string>, rms: number, bands: number[]): Promise<Uint8Array> {
+        await this.page!.evaluate(async (f, r, tf, vm, rV, bA) => {
+            await (window as any).renderFrame(f, r, tf, vm, rV, bA);
+        }, frame, fps, totalFrames, vMap, rms, bands);
         return await this.page!.screenshot({ type: "png", omitBackground: true }) as Uint8Array;
     }
 

@@ -118,7 +118,7 @@ export class TiramisuPlayer<T = any> {
                 this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
                 
                 this.audioAnalyser = this.audioContext.createAnalyser();
-                this.audioAnalyser.fftSize = 256;
+                this.audioAnalyser.fftSize = 64; // Small FFT for visualizer demo (32 bins)
             } catch (e) {
                 console.error("Failed to load audio file", e);
             }
@@ -137,6 +137,7 @@ export class TiramisuPlayer<T = any> {
             if (this.audioContext.state === 'suspended') this.audioContext.resume();
             this.audioSource = this.audioContext.createBufferSource();
             this.audioSource.buffer = this.audioBuffer;
+            // Connect source to analyser, then analyser to destination
             this.audioSource.connect(this.audioAnalyser!);
             this.audioAnalyser!.connect(this.audioContext.destination);
             
@@ -212,12 +213,28 @@ export class TiramisuPlayer<T = any> {
         }
         return Math.sqrt(sum / dataArray.length) * 2;
     }
+    
+    private getAudioBands(count: number = 32): number[] {
+        if (!this.audioAnalyser) return Array(count).fill(0);
+        // frequencyBinCount is fftSize / 2, which is 32 in this case.
+        const dataArray = new Uint8Array(this.audioAnalyser.frequencyBinCount);
+        this.audioAnalyser.getByteFrequencyData(dataArray);
+
+        // Map the bins to a normalized array (0-1)
+        const bins = Array.from(dataArray.slice(0, count));
+        // Simple normalization (0-255 range from getByteFrequencyData)
+        return bins.map(v => v / 255.0);
+    }
 
     // Public render method for forcing updates
     public renderFrame(frame: number) {
         const totalFrames = Math.ceil(this.config.fps * this.config.durationSeconds);
         const progress = frame / (totalFrames - 1 || 1);
+        
+        // --- NEW AUDIO DATA RETRIEVAL ---
         const volume = this.getAudioVolume();
+        const bands = this.getAudioBands(32); // Use 32 bins for the visualizer
+        // ---------------------------------
 
         // Sync Videos
         const targetTime = frame / this.config.fps;
@@ -248,6 +265,7 @@ export class TiramisuPlayer<T = any> {
                         localFrame: frame - clip.startFrame,
                         localProgress: (frame - clip.startFrame) / (clip.endFrame - clip.startFrame - 1 || 1),
                         audioVolume: volume,
+                        audioBands: bands, // <-- NEW
                         ctx: this.ctx,
                         canvas: this.canvas,
                         width: this.config.width,

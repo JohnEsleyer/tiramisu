@@ -1,41 +1,51 @@
 import { spawn } from "bun";
+import { join, isAbsolute } from 'path';
+import { existsSync } from 'fs';
+
+// --- WASM IMPORT ---
+// Note: This import will fail until you run 'bun run build:visualizer' 
+// because the generated files don't exist yet.
+import { AudioVisualizer } from './wasm/tiramisu_audio_analyzer'; 
+// -------------------
 
 export class AudioAnalyzer {
     /**
-     * Extracts volume levels (RMS) per frame from an audio file.
-     * Returns an array of numbers between 0 and 1.
+     * Extracts full 32-band FFT data per frame from an audio file using Wasm.
+     * Uses a stateful AudioVisualizer that replicates Web Audio API behavior.
      */
-    public async analyze(audioFile: string, fps: number, durationSeconds: number): Promise<number[]> {
-        console.log("   🎵 Analyzing Audio...");
+    public async analyze(audioFile: string, fps: number, durationSeconds: number): Promise<{ rms: number, bands: number[] }[]> {
+        console.log(`   🎵 Analyzing Audio (Universal Wasm Engine): ${audioFile}`);
+
+        // 1. Resolve Absolute Path
+        const absolutePath = isAbsolute(audioFile) ? audioFile : join(process.cwd(), audioFile);
+        if (!existsSync(absolutePath)) {
+            console.error(`   ❌ Audio Analysis Failed: File not found at ${absolutePath}`);
+            return [];
+        }
 
         const sampleRate = 44100;
         const totalFrames = Math.ceil(fps * durationSeconds);
         const samplesPerFrame = Math.floor(sampleRate / fps);
+        const BANDS_COUNT = 32; 
         
-        // We spawn FFmpeg to output raw 16-bit Little Endian PCM mono audio
+        // 2. Spawn FFmpeg for Raw PCM
         const ffmpegArgs = [
             "ffmpeg",
-            "-i", audioFile,
+            "-i", absolutePath,
             "-ac", "1",              // Downmix to mono
-            "-ar", sampleRate.toString(), // Set sample rate
+            "-ar", sampleRate.toString(), 
             "-f", "s16le",           // Output raw PCM 16-bit
-            "-acodec", "pcm_s16le",  // Codec
-            "-t", durationSeconds.toString(), // Limit duration
-            "-"                      // Pipe to stdout
+            "-acodec", "pcm_s16le",  
+            "-t", durationSeconds.toString(),
+            "-"                      
         ];
 
-        const proc = spawn(ffmpegArgs, {
-            stdout: "pipe",
-            stderr: "ignore" // We don't need logs here
-        });
-
-        const stream = proc.stdout;
-        const reader = stream.getReader();
+        const proc = spawn(ffmpegArgs, { stdout: "pipe", stderr: "inherit" });
+        const reader = proc.stdout.getReader();
         
         let chunks: Uint8Array[] = [];
         let totalLength = 0;
 
-        // Read all data into memory (audio is small enough)
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -43,7 +53,11 @@ export class AudioAnalyzer {
             totalLength += value.length;
         }
 
-        // Merge chunks
+        if (totalLength === 0) {
+            return Array(totalFrames).fill({ rms: 0, bands: Array(BANDS_COUNT).fill(0) });
+        }
+
+        // Merge Buffer
         const fullBuffer = new Uint8Array(totalLength);
         let offset = 0;
         for (const chunk of chunks) {
@@ -51,44 +65,45 @@ export class AudioAnalyzer {
             offset += chunk.length;
         }
 
-        // Process samples
-        // 16-bit audio = 2 bytes per sample
-        const dataView = new DataView(fullBuffer.buffer);
+        // 3. Initialize Universal Wasm Visualizer
+        const visualizer = new AudioVisualizer();
+        
         const totalSamples = Math.floor(totalLength / 2);
-        const levels: number[] = [];
+        const analysisData: { rms: number, bands: number[] }[] = [];
+        const fullInt16Array = new Int16Array(fullBuffer.buffer);
 
         for (let f = 0; f < totalFrames; f++) {
             const startSample = f * samplesPerFrame;
-            let sumSquares = 0;
-            let count = 0;
+            const endSample = Math.min(startSample + samplesPerFrame, totalSamples);
+            
+            // For 1:1 match: pass the chunk leading up to this frame.
+            // The Wasm visualizer will take the *last 64 samples* of this chunk.
+            const frameSamples = fullInt16Array.slice(startSample, endSample);
+            
+            // Call Wasm (State is maintained internally)
+            const bandsFloat = visualizer.process_frame(frameSamples);
+            
+            // --- FIX FOR TYPE ERROR ---
+            // Explicitly cast to number[] to satisfy TypeScript
+            const bands = Array.from(bandsFloat) as number[];
 
-            for (let i = 0; i < samplesPerFrame; i++) {
-                const sampleIdx = startSample + i;
-                if (sampleIdx >= totalSamples) break;
-
-                // Read 16-bit signed integer (-32768 to 32767)
-                const sample = dataView.getInt16(sampleIdx * 2, true);
-                
-                // Normalize to -1 to 1
-                const norm = sample / 32768.0;
-                sumSquares += norm * norm;
-                count++;
+            // Simple RMS for the "Pulse" effect
+            let sumSq = 0;
+            for(let i=0; i<frameSamples.length; i++) {
+                const val = frameSamples[i] / 32768.0;
+                sumSq += val * val;
             }
+            const frameRms = Math.sqrt(sumSq / (frameSamples.length || 1));
+            // Boost RMS slightly for visual impact
+            const rms = Math.min(frameRms * 2.0, 1.0);
 
-            if (count > 0) {
-                // RMS (Root Mean Square)
-                const rms = Math.sqrt(sumSquares / count);
-                levels.push(rms);
-            } else {
-                levels.push(0);
-            }
+            analysisData.push({ rms, bands });
         }
 
-        // Normalize the entire array so the loudest frame is 1.0 (optional, but good for vis)
-        const maxLevel = Math.max(...levels) || 1;
-        const normalizedLevels = levels.map(l => l / maxLevel);
+        // Cleanup Wasm memory
+        if ((visualizer as any).free) (visualizer as any).free();
 
-        console.log(`   📊 Audio Analyzed: ${normalizedLevels.length} frames.`);
-        return normalizedLevels;
+        console.log(`   📊 Audio Analyzed: ${analysisData.length} frames (1:1 Client Match).`);
+        return analysisData;
     }
 }

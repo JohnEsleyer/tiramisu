@@ -377,114 +377,164 @@ class TiramisuPlayer {
   }
 }
 
-// examples/snow-overlay/app.ts
+// examples/music-visualizer/app.ts
 var canvasId = "preview-canvas";
-var statusEl = document.getElementById("status");
+var videoInput = document.getElementById("video-input");
+var audioInput = document.getElementById("audio-input");
 var btnPlay = document.getElementById("btn-play");
 var btnRender = document.getElementById("btn-render");
-var DURATION = 6;
-var FPS = 30;
-var PARTICLE_COUNT = 300;
-var RENDER_WIDTH = 1280;
-var RENDER_HEIGHT = 720;
-var RANDOM_SEED = 12345;
+var statusEl = document.getElementById("status");
+var appState = {
+  width: 1280,
+  height: 720,
+  duration: 5,
+  videoUrl: null,
+  audioUrl: null,
+  videoFile: null,
+  audioFile: null
+};
 var player = new TiramisuPlayer({
-  width: RENDER_WIDTH,
-  height: RENDER_HEIGHT,
-  fps: FPS,
-  durationSeconds: DURATION,
+  width: appState.width,
+  height: appState.height,
+  fps: 30,
+  durationSeconds: appState.duration,
   canvas: canvasId,
-  data: {
-    particleCount: PARTICLE_COUNT,
-    randomSeed: RANDOM_SEED,
-    totalDuration: DURATION,
-    maxParticleSpeed: 100
-  }
+  data: appState
 });
-player.addClip(0, DURATION, ({ ctx, width, height }) => {
-  const grad = ctx.createLinearGradient(0, 0, 0, height);
-  grad.addColorStop(0, "#0e131f");
-  grad.addColorStop(1, "#1c253c");
-  ctx.fillStyle = grad;
+var backgroundClip = ({ ctx, width, height, videos, data, utils, audioVolume }) => {
+  ctx.fillStyle = "black";
   ctx.fillRect(0, 0, width, height);
-}, 0);
-var snowClip = ({ ctx, width, height, frame, fps, data, utils }) => {
-  const masterRNG = utils.seededRandomGenerator(data.randomSeed);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-  ctx.shadowBlur = 4;
-  ctx.shadowColor = "white";
-  for (let i = 0;i < data.particleCount; i++) {
-    const particleSeed = data.randomSeed + i;
-    const pRNG = utils.seededRandomGenerator(particleSeed);
-    const startX = pRNG() * width;
-    const startY = pRNG() * height;
-    const size = utils.lerp(1, 3, pRNG());
-    const fallSpeed = utils.lerp(10, data.maxParticleSpeed, size / 3);
-    const windAmplitude = utils.lerp(20, 80, pRNG());
-    const windFrequency = utils.lerp(0.5, 1.5, pRNG());
-    const currentTime = frame / fps;
-    const yTravel = fallSpeed * currentTime;
-    const y = (startY + yTravel) % height;
-    const normalizedTime = currentTime / data.totalDuration;
-    const xDrift = Math.sin(normalizedTime * Math.PI * 2 * windFrequency) * windAmplitude;
-    const x = startX + xDrift;
-    ctx.beginPath();
-    ctx.arc(x, y, size, 0, Math.PI * 2);
+  if (data.videoUrl && videos[data.videoUrl]) {
+    const vid = videos[data.videoUrl];
+    if (vid.readyState >= 1) {
+      const pulseScale = 1 + audioVolume * 0.1;
+      ctx.save();
+      ctx.translate(width / 2, height / 2);
+      ctx.scale(pulseScale, pulseScale);
+      ctx.translate(-width / 2, -height / 2);
+      utils.drawMediaFit(ctx, vid, width, height);
+      ctx.restore();
+    }
+  } else {
+    ctx.fillStyle = "#374151";
+    ctx.font = "bold 40px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("NO VIDEO/AUDIO LOADED", width / 2, height / 2);
+  }
+};
+player.addClip(0, 600, backgroundClip, 0);
+var visualizerClip = ({ ctx, width, height, audioBands, audioVolume, utils }) => {
+  const barCount = audioBands.length;
+  const barWidth = width / barCount / 1.5;
+  const padding = barWidth / 2;
+  const baseHeight = height * 0.2;
+  const maxBarHeight = height * 0.3;
+  const barColor = (v) => `rgba(245, 158, 11, ${utils.clamp(v * 2, 0.2, 1)})`;
+  ctx.save();
+  ctx.translate(padding, height - padding - 10);
+  for (let i = 0;i < barCount; i++) {
+    const bandValue = audioBands[i];
+    const h = baseHeight + bandValue * maxBarHeight;
+    const x = i * (barWidth + padding);
+    const y = -h;
+    ctx.fillStyle = barColor(bandValue);
+    utils.drawRoundedRect(ctx, x, y, barWidth, h, 5);
     ctx.fill();
   }
-  ctx.shadowBlur = 0;
+  ctx.restore();
+  const circleRadius = 50 + audioVolume * 80;
+  ctx.beginPath();
+  ctx.arc(width - 80, 80, circleRadius, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(245, 158, 11, ${utils.clamp(audioVolume * 2, 0.1, 0.8)})`;
+  ctx.fill();
+  ctx.strokeStyle = "#f59e0b";
+  ctx.lineWidth = 4;
+  ctx.stroke();
 };
-player.addClip(0, DURATION, snowClip, 1);
+player.addClip(0, 600, visualizerClip, 1);
+function updateControls() {
+  const ready = appState.videoFile && appState.audioFile;
+  btnPlay.disabled = !ready;
+  btnRender.disabled = !ready;
+  btnPlay.style.cursor = ready ? "pointer" : "not-allowed";
+  btnRender.style.cursor = ready ? "pointer" : "not-allowed";
+}
+async function handleFile(file, type) {
+  statusEl.innerText = `⏳ Reading ${type} file...`;
+  if (type === "video") {
+    if (appState.videoUrl)
+      URL.revokeObjectURL(appState.videoUrl);
+    appState.videoUrl = URL.createObjectURL(file);
+    appState.videoFile = file;
+    const tempVideo = document.createElement("video");
+    tempVideo.preload = "metadata";
+    tempVideo.src = appState.videoUrl;
+    await new Promise((resolve) => tempVideo.onloadedmetadata = () => {
+      appState.duration = tempVideo.duration;
+      resolve(null);
+    });
+  } else {
+    if (appState.audioUrl)
+      URL.revokeObjectURL(appState.audioUrl);
+    appState.audioUrl = URL.createObjectURL(file);
+    appState.audioFile = file;
+  }
+  if (appState.videoUrl && appState.audioUrl) {
+    player.config.durationSeconds = appState.duration;
+    player.config.videos = [appState.videoUrl];
+    player.config.audioFile = appState.audioUrl;
+    await player.load();
+    player.seek(0);
+    statusEl.innerText = `✅ Ready. Duration: ${appState.duration.toFixed(1)}s`;
+  }
+  updateControls();
+}
+videoInput.addEventListener("change", (e) => handleFile(e.target.files[0], "video"));
+audioInput.addEventListener("change", (e) => handleFile(e.target.files[0], "audio"));
 btnPlay.addEventListener("click", () => {
   const isPlaying = player.isPlaying;
   if (isPlaying) {
     player.pause();
-    btnPlay.innerText = "▶ Play Preview";
+    btnPlay.innerHTML = "▶ Play Preview";
   } else {
     player.play();
-    btnPlay.innerText = "⏸ Pause Preview";
+    btnPlay.innerHTML = "⏸ Pause Preview";
   }
 });
 btnRender.addEventListener("click", async () => {
+  if (!appState.videoFile || !appState.audioFile)
+    return;
   btnRender.disabled = true;
   btnRender.innerText = "⏳ Rendering...";
-  statusEl.innerText = "\uD83C\uDFAC Sending render job to server...";
+  statusEl.innerText = "\uD83C\uDFAC Uploading files and starting server render...";
   try {
-    const payload = {
-      width: RENDER_WIDTH,
-      height: RENDER_HEIGHT,
-      fps: FPS,
-      duration: DURATION,
-      particleCount: PARTICLE_COUNT,
-      randomSeed: RANDOM_SEED,
-      maxParticleSpeed: 100
-    };
-    const response = await fetch("/api/render-snow", {
+    const formData = new FormData;
+    formData.append("video", appState.videoFile);
+    formData.append("audio", appState.audioFile);
+    formData.append("width", appState.width.toString());
+    formData.append("height", appState.height.toString());
+    formData.append("duration", appState.duration.toString());
+    const response = await fetch("/api/render-visualizer", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: formData
     });
     if (!response.ok)
-      throw new Error("Server render failed");
+      throw new Error("Render failed");
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `snow_overlay_render.mp4`;
-    document.body.appendChild(a);
+    a.download = `tiramisu_visualizer_render.mp4`;
     a.click();
-    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    statusEl.innerText = "✨ Success! Check your downloads.";
-  } catch (err) {
-    console.error(err);
-    statusEl.innerText = "❌ Error during render/download.";
+    statusEl.innerText = "✨ Download Started!";
+  } catch (e) {
+    console.error(e);
+    statusEl.innerText = "❌ Render Failed. Check server console.";
   } finally {
     btnRender.disabled = false;
     btnRender.innerText = "\uD83C\uDFAC Render MP4";
+    updateControls();
   }
 });
-player.load().then(() => {
-  statusEl.innerText = "✅ Ready to play.";
-  player.seek(0);
-});
+updateControls();

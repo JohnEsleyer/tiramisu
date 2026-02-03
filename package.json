@@ -10,6 +10,8 @@
 
     "build": "bun build ./index.ts --target bun --outfile ./dist/tiramisu.js",
     
+    "build:wasm": "cd src/rust_audio && cargo build --target wasm32-unknown-unknown --release && cd ../.. && wasm-bindgen src/rust_audio/target/wasm32-unknown-unknown/release/tiramisu_audio_analyzer.wasm --out-dir ./src/wasm --target nodejs",
+
     "build:editor": "bun build ./examples/video-editor/app.ts --target browser --outfile ./examples/video-editor/editor-bundle.js $BASE_EXTERNAL",
     "dev:editor": "bun run build:editor && bun run examples/serve.ts",
     
@@ -27,6 +29,9 @@
     
     "build:snow": "bun build ./examples/snow-overlay/app.ts --target browser --outfile ./examples/snow-overlay/bundle.js $BASE_EXTERNAL",
     "dev:snow": "bun run build:snow && bun run examples/serve.ts",
+    
+    "build:visualizer": "bun run build:wasm && bun build ./examples/music-visualizer/app.ts --target browser --outfile ./examples/music-visualizer/bundle.js $BASE_EXTERNAL",
+    "dev:visualizer": "bun run build:visualizer && bun run examples/serve.ts",
     
     "start:server": "bun run examples/serve.ts"
   },
