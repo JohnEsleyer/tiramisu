@@ -19,6 +19,9 @@
     "build:audio-overlay": "bun build ./examples/video-audio-overlay/app.ts --target browser --outfile ./examples/video-audio-overlay/bundle.js $BASE_EXTERNAL",
     "dev:audio-overlay": "bun run build:audio-overlay && bun run examples/serve.ts",
 
+    "build:split-screen": "bun build ./examples/split-screen/app.ts --target browser --outfile ./examples/split-screen/bundle.js $BASE_EXTERNAL",
+    "dev:split-screen": "bun run build:split-screen && bun run examples/serve.ts",
+    
     "start:server": "bun run examples/serve.ts"
   },
   "dependencies": {

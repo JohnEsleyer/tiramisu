@@ -6,187 +6,92 @@ export class TiramisuBrowser {
     private browser?: Browser;
     private page?: Page;
 
-
     public async init(width: number, height: number, headless: boolean) {
         this.browser = await puppeteer.launch({
-            headless: headless,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--font-render-hinting=none',
-                // --- ADD THESE FLAGS ---
-                '--autoplay-policy=no-user-gesture-required',
-                '--disable-features=PreloadMediaEngagementData,AutoplayIgnoreWebAudio',
-                '--use-fake-ui-for-media-stream'
-            ]
+            headless: headless ? "shell" : false,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
         this.page = await this.browser.newPage();
-        this.page.on('console', msg => console.log('PAGE LOG:', msg.text()));
-
         await this.page.setViewport({ width, height, deviceScaleFactor: 1 });
-
-        // Console logs are disabled to prevent CLI artifacts
-        // this.page.on('console', msg => console.log('PAGE LOG:', msg.text()));
     }
 
     public async setupScene(
-        url: string,
-        clips: Clip[],
-        width: number,
-        height: number,
-        data: any,
-        assets: string[],
-        videos: string[],
-        fonts: { name: string, url: string }[],
-        audioLevels: number[]
+        url: string, clips: Clip[], width: number, height: number, 
+        data: any, assets: string[], videoKeys: string[], audioLevels: number[]
     ) {
         if (!this.page) return;
-
-        console.log(`   Loading Stage: ${url}`);
         await this.page.goto(url);
-
         await this.page.evaluate(BROWSER_UTILS_CODE);
 
-        await this.page.evaluate(async (
-            clipList: Clip[],
-            w: number,
-            h: number,
-            injectedData: any,
-            assetList: string[],
-            videoList: string[],
-            fontList: { name: string, url: string }[],
-            levels: number[]
-        ) => {
-            // @ts-ignore
-            window.setupStage(w, h);
+        await this.page.evaluate(async (clipList, w, h, injectedData, assetList, videoKeyList, levels) => {
+            const win = window as any;
+            
+            // PIN CANVAS TO TOP LEFT
+            document.body.style.margin = "0";
+            document.body.style.padding = "0";
+            document.body.style.overflow = "hidden";
+            document.body.style.backgroundColor = "black";
 
-            if (fontList && fontList.length > 0) {
-                const fontPromises = fontList.map(f => {
-                    const font = new FontFace(f.name, `url(${f.url})`);
-                    return font.load().then(loaded => {
-                        // @ts-ignore
-                        document.fonts.add(loaded);
-                    }).catch(e => console.error(e));
-                });
-                await Promise.all(fontPromises);
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.style.position = "absolute";
+            canvas.style.top = "0";
+            canvas.style.left = "0";
+            document.body.appendChild(canvas);
+            
+            win.loadedAssets = {};
+            for (const src of assetList) {
+                const img = new Image(); img.src = src;
+                await new Promise(r => img.onload = r);
+                win.loadedAssets[src] = img;
             }
 
-            // @ts-ignore
-            window.loadedAssets = {};
-            const imagePromises = assetList.map(src => new Promise(res => {
-                const img = new Image(); img.crossOrigin = "Anonymous"; img.src = src;
-                // @ts-ignore
-                img.onload = () => { window.loadedAssets[src] = img; res(null); };
-                img.onerror = () => res(null);
-            }));
+            win.loadedVideos = {};
+            videoKeyList.forEach(key => { win.loadedVideos[key] = new Image(); });
 
-            // @ts-ignore
-            window.loadedVideos = {};
-            const videoPromises = videoList.map(src => new Promise(res => {
-                const vid = document.createElement('video');
-                vid.crossOrigin = "Anonymous";
-                vid.src = src;
-                vid.muted = true;
-                vid.playsInline = true;
+            win.activeClips = clipList.map(c => ({
+                ...c, fn: new Function('return ' + c.drawFunction)()
+            })).sort((a: any, b: any) => a.zIndex - b.zIndex);
 
-                // FIX: Force the browser to render the video by making it 'visible' but off-screen
-                vid.style.position = "absolute";
-                vid.style.top = "-9999px";
-                vid.style.left = "-9999px";
-                vid.style.width = "1px";
-                vid.style.height = "1px";
-                vid.style.opacity = "0.01";
-
-                // Add preload
-                vid.preload = "auto";
-                document.body.appendChild(vid);
-
-                vid.onloadeddata = () => {
-                    console.log(`Video Loaded Successfully: ${src}`); // Success Log
-                    // @ts-ignore
-                    window.loadedVideos[src] = vid;
-                    res(null);
-                };
-
-                vid.onerror = (e) => {
-                    // @ts-ignore
-                    const err = vid.error;
-                    console.error(`Video Failed: ${src}`, err ? `Code: ${err.code}, Msg: ${err.message}` : "");
-                    res(null);
-                };
-            }));
-
-            await Promise.all([...imagePromises, ...videoPromises]);
-
-            // @ts-ignore
-            window.activeClips = clipList.map(c => ({
-                ...c,
-                fn: new Function('return ' + c.drawFunction)()
-            })).sort((a, b) => a.zIndex - b.zIndex);
-
-            // @ts-ignore
-            window.renderFrame = async (frame, fps, totalFrames) => {
-                const canvas = document.getElementById('stage') as HTMLCanvasElement;
+            win.renderFrame = async (frame: number, fps: number, totalFrames: number, vMap: Record<string, string>) => {
                 const ctx = canvas.getContext('2d')!;
-                const currentTime = frame / fps;
-
-                // @ts-ignore
-                const videoSyncPromises = Object.values(window.loadedVideos).map((vid: HTMLVideoElement) => {
-                    return new Promise(resolve => {
-                        if (Math.abs(vid.currentTime - currentTime) < 0.001) return resolve(null);
-                        const onSeek = () => resolve(null);
-                        vid.addEventListener('seeked', onSeek, { once: true });
-                        vid.currentTime = currentTime;
+                
+                // Virtual Video Sync
+                await Promise.all(Object.entries(vMap).map(([key, path]) => {
+                    return new Promise(res => {
+                        const img = win.loadedVideos[key];
+                        if (img.src.includes(path)) return res(null);
+                        img.onload = () => res(null);
+                        img.src = path;
                     });
-                });
-                await Promise.all(videoSyncPromises);
+                }));
 
                 ctx.clearRect(0, 0, w, h);
-
-                const currentVolume = levels[frame] || 0;
-
-                // @ts-ignore
-                window.activeClips.forEach(clip => {
+                for (const clip of win.activeClips) {
                     if (frame >= clip.startFrame && frame < clip.endFrame) {
-                        const localFrame = frame - clip.startFrame;
-                        const duration = clip.endFrame - clip.startFrame;
-
                         clip.fn({
-                            frame,
+                            frame, ctx, canvas, width: w, height: h, fps,
                             progress: frame / (totalFrames - 1 || 1),
-                            localFrame,
-                            localProgress: localFrame / (duration - 1 || 1),
-                            audioVolume: currentVolume,
-                            ctx,
-                            canvas,
-                            width: w,
-                            height: h,
-                            fps,
+                            localProgress: (frame - clip.startFrame) / (clip.endFrame - clip.startFrame - 1 || 1),
+                            audioVolume: levels[frame] || 0,
                             data: injectedData,
-                            // @ts-ignore
-                            assets: window.loadedAssets,
-                            // @ts-ignore
-                            videos: window.loadedVideos,
-                            // @ts-ignore
-                            utils: window.TiramisuUtils
+                            assets: win.loadedAssets,
+                            videos: win.loadedVideos,
+                            utils: win.TiramisuUtils
                         });
                     }
-                });
+                }
             };
-        }, clips, width, height, data, assets, videos, fonts, audioLevels);
+        }, clips, width, height, data, assets, videoKeys, audioLevels);
     }
 
-    public async renderFrame(frame: number, fps: number, totalFrames: number): Promise<Uint8Array> {
-        if (!this.page) throw new Error("Browser not initialized");
-        await this.page.evaluate(async (f, r, tf) => {
-            // @ts-ignore
-            await window.renderFrame(f, r, tf);
-        }, frame, fps, totalFrames);
-
-        return await this.page.screenshot({ type: "png", omitBackground: true }) as Uint8Array;
+    public async renderFrame(frame: number, fps: number, totalFrames: number, vMap: Record<string, string>): Promise<Uint8Array> {
+        await this.page!.evaluate(async (f, r, tf, vm) => {
+            await (window as any).renderFrame(f, r, tf, vm);
+        }, frame, fps, totalFrames, vMap);
+        // Screenshot specifically the viewport which now contains only the top-left canvas
+        return await this.page!.screenshot({ type: "png", omitBackground: true }) as Uint8Array;
     }
 
-    public async close() {
-        await this.browser?.close();
-    }
+    public async close() { await this.browser?.close(); }
 }
