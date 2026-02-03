@@ -22,6 +22,9 @@
     "build:split-screen": "bun build ./examples/split-screen/app.ts --target browser --outfile ./examples/split-screen/bundle.js $BASE_EXTERNAL",
     "dev:split-screen": "bun run build:split-screen && bun run examples/serve.ts",
     
+    "build:mask": "bun build ./examples/luma-matte/app.ts --target browser --outfile ./examples/luma-matte/bundle.js $BASE_EXTERNAL",
+    "dev:mask": "bun run build:mask && bun run examples/serve.ts",
+    
     "start:server": "bun run examples/serve.ts"
   },
   "dependencies": {

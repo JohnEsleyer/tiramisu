@@ -79,7 +79,36 @@ export const TiramisuUtils = {
             dx = 0; dy = (targetH - dh) / 2;
         }
         ctx.drawImage(media, dx, dy, dw, dh);
-    }
+    },
+
+    /**
+     * Stencil Masking
+     * Draws the 'maskFn' (shape), then uses 'source-in' to fill it with 'contentFn'.
+     * Great for video-in-text or video-in-shape.
+     */
+    drawMasked: (ctx: CanvasRenderingContext2D, contentFn: (c: CanvasRenderingContext2D) => void, maskFn: (c: CanvasRenderingContext2D) => void) => {
+        const { width, height } = ctx.canvas;
+        
+        // 1. Create a temporary offscreen buffer
+        // Note: In the browser (Puppeteer), we use document.createElement
+        const buffer = document.createElement('canvas');
+        buffer.width = width;
+        buffer.height = height;
+        const bCtx = buffer.getContext('2d')!;
+
+        // 2. Draw the MASK (the shape) onto the buffer
+        maskFn(bCtx);
+
+        // 3. Set composite mode: Only draw where the mask exists
+        bCtx.globalCompositeOperation = "source-in";
+
+        // 4. Draw the CONTENT (the video/image) onto the buffer
+        contentFn(bCtx);
+
+        // 5. Draw the final result onto the main canvas
+        ctx.drawImage(buffer, 0, 0);
+    },
+
 };
 
 export const BROWSER_UTILS_CODE = `
@@ -96,6 +125,7 @@ window.TiramisuUtils = {
     easeOutBounce: ${TiramisuUtils.easeOutBounce.toString()},
     drawRoundedRect: ${TiramisuUtils.drawRoundedRect.toString()},
     drawMediaFit: ${TiramisuUtils.drawMediaFit.toString()},
-    drawMediaCover: ${TiramisuUtils.drawMediaCover.toString()}
+    drawMediaCover: ${TiramisuUtils.drawMediaCover.toString()},
+    drawMasked: ${TiramisuUtils.drawMasked.toString()}
 };
 `;
