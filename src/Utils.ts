@@ -1,3 +1,13 @@
+// A simple, fast, and deterministic Pseudo-Random Number Generator (Mulberry32)
+const mulberry32 = (a: number) => {
+    return function() {
+        let t = a += 0x6d2b79f5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+}
+
 export const TiramisuUtils = {
     lerp: (start: number, end: number, t: number) => start * (1 - t) + end * t,
     clamp: (val: number, min: number, max: number) => Math.min(Math.max(val, min), max),
@@ -18,6 +28,9 @@ export const TiramisuUtils = {
         else if (t < 2.5 / d1) return n1 * (t -= 2.25 / d1) * t + 0.9375;
         else return n1 * (t -= 2.625 / d1) * t + 0.984375;
     },
+
+    /** Returns a deterministic, repeatable random number generator function */
+    seededRandomGenerator: (seed: number) => mulberry32(seed),
 
     drawRoundedRect: (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
         if (w < 2 * r) r = w / 2; if (h < 2 * r) r = h / 2;
@@ -112,6 +125,8 @@ export const TiramisuUtils = {
 };
 
 export const BROWSER_UTILS_CODE = `
+const mulberry32 = ${mulberry32.toString()};
+
 window.TiramisuUtils = {
     lerp: ${TiramisuUtils.lerp.toString()},
     clamp: ${TiramisuUtils.clamp.toString()},
@@ -123,6 +138,8 @@ window.TiramisuUtils = {
     easeInCubic: ${TiramisuUtils.easeInCubic.toString()},
     easeOutCubic: ${TiramisuUtils.easeOutCubic.toString()},
     easeOutBounce: ${TiramisuUtils.easeOutBounce.toString()},
+    // Pass the generator function creator for deterministic randomness
+    seededRandomGenerator: mulberry32, 
     drawRoundedRect: ${TiramisuUtils.drawRoundedRect.toString()},
     drawMediaFit: ${TiramisuUtils.drawMediaFit.toString()},
     drawMediaCover: ${TiramisuUtils.drawMediaCover.toString()},

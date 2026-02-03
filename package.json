@@ -25,6 +25,9 @@
     "build:mask": "bun build ./examples/luma-matte/app.ts --target browser --outfile ./examples/luma-matte/bundle.js $BASE_EXTERNAL",
     "dev:mask": "bun run build:mask && bun run examples/serve.ts",
     
+    "build:snow": "bun build ./examples/snow-overlay/app.ts --target browser --outfile ./examples/snow-overlay/bundle.js $BASE_EXTERNAL",
+    "dev:snow": "bun run build:snow && bun run examples/serve.ts",
+    
     "start:server": "bun run examples/serve.ts"
   },
   "dependencies": {
