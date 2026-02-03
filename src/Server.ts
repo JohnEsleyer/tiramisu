@@ -30,9 +30,14 @@ export class TiramisuServer {
                 const file = Bun.file(filePath);
 
                 if (await file.exists()) {
+                    // --- ADD THIS LOG ---
+                    if (filePath.endsWith(".mp4")) {
+                        console.log(`[Server] Serving video asset: ${url.pathname}`);
+                    }
                     return new Response(file);
                 }
 
+                console.log(`[Server] 404 Not Found: ${url.pathname}`); // Log missing files
                 return new Response("Not Found", { status: 404 });
             },
         });

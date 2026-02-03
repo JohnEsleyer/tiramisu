@@ -10,6 +10,7 @@ bufferCanvas.width = 1280;
 bufferCanvas.height = 720;
 
 let currentVideoUrl: string | null = null;
+let selectedFile: File | null = null;
 
 // 1. Initialize Player
 const player = new TiramisuPlayer({
@@ -25,7 +26,7 @@ const player = new TiramisuPlayer({
 player.addClip(0, 10, ({ ctx, width, height, videos }) => {
     if (currentVideoUrl && videos[currentVideoUrl]) {
         const vid = videos[currentVideoUrl];
-        
+
         // If the video is ready, update our buffer
         // readyState 2+ means it has a frame available
         if (vid.readyState >= 2 && !vid.seeking) {
@@ -53,24 +54,26 @@ videoInput.addEventListener("change", async (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
 
+    selectedFile = file;
+
     if (currentVideoUrl) URL.revokeObjectURL(currentVideoUrl);
     currentVideoUrl = URL.createObjectURL(file);
 
     // Create a temporary video element to get the duration
     const tempVideo = document.createElement('video');
     tempVideo.src = currentVideoUrl;
-    
+
     await new Promise((resolve) => {
         tempVideo.onloadedmetadata = () => {
             // Update Player duration to match Video
             (player as any).config.durationSeconds = tempVideo.duration;
             (player as any).config.videos = [currentVideoUrl!];
-            
+
             // Re-calculate clip frames based on new duration
             (player as any).clips.forEach((clip: any) => {
                 clip.endFrame = Math.floor(tempVideo.duration * (player as any).config.fps);
             });
-            
+
             resolve(null);
         };
     });
@@ -78,6 +81,49 @@ videoInput.addEventListener("change", async (e) => {
     await player.load();
     player.seek(0); // Reset to start
     alert(`Video Loaded: ${tempVideo.duration.toFixed(2)}s`);
+});
+
+const btnRender = document.getElementById("btn-render") as HTMLButtonElement;
+
+btnRender.addEventListener("click", async () => {
+    if (!selectedFile) {
+        alert("Please upload a video first!");
+        return;
+    }
+
+    btnRender.disabled = true;
+    btnRender.innerText = "⏳ Uploading & Rendering...";
+
+    try {
+        // Create FormData to send the file
+        const formData = new FormData();
+        formData.append("video", selectedFile);
+        formData.append("fps", "30");
+        formData.append("duration", "5");
+
+        const response = await fetch("/api/export", {
+            method: "POST",
+            body: formData, // Browser automatically sets Content-Type to multipart/form-data
+        });
+
+        if (!response.ok) throw new Error("Render failed");
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "tiramisu-video-export.mp4";
+        a.click();
+        URL.revokeObjectURL(url);
+
+        alert("✅ Export Successful!");
+    } catch (e) {
+        console.error(e);
+        alert("❌ Error rendering.");
+    } finally {
+        btnRender.disabled = false;
+        btnRender.innerText = "🎬 Render MP4";
+    }
 });
 
 // 4. Playback Controls

@@ -6,46 +6,52 @@ export class TiramisuBrowser {
     private browser?: Browser;
     private page?: Page;
 
+
     public async init(width: number, height: number, headless: boolean) {
         this.browser = await puppeteer.launch({
             headless: headless,
             args: [
-                '--no-sandbox', 
-                '--disable-setuid-sandbox', 
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
                 '--font-render-hinting=none',
-                '--autoplay-policy=no-user-gesture-required' 
+                // --- ADD THESE FLAGS ---
+                '--autoplay-policy=no-user-gesture-required',
+                '--disable-features=PreloadMediaEngagementData,AutoplayIgnoreWebAudio',
+                '--use-fake-ui-for-media-stream'
             ]
         });
         this.page = await this.browser.newPage();
+        this.page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+
         await this.page.setViewport({ width, height, deviceScaleFactor: 1 });
-        
+
         // Console logs are disabled to prevent CLI artifacts
         // this.page.on('console', msg => console.log('PAGE LOG:', msg.text()));
     }
 
     public async setupScene(
-        url: string, 
-        clips: Clip[], 
-        width: number, 
-        height: number, 
-        data: any, 
+        url: string,
+        clips: Clip[],
+        width: number,
+        height: number,
+        data: any,
         assets: string[],
         videos: string[],
         fonts: { name: string, url: string }[],
         audioLevels: number[]
     ) {
         if (!this.page) return;
-        
+
         console.log(`   Loading Stage: ${url}`);
         await this.page.goto(url);
 
         await this.page.evaluate(BROWSER_UTILS_CODE);
 
         await this.page.evaluate(async (
-            clipList: Clip[], 
-            w: number, 
-            h: number, 
-            injectedData: any, 
+            clipList: Clip[],
+            w: number,
+            h: number,
+            injectedData: any,
             assetList: string[],
             videoList: string[],
             fontList: { name: string, url: string }[],
@@ -58,8 +64,8 @@ export class TiramisuBrowser {
                 const fontPromises = fontList.map(f => {
                     const font = new FontFace(f.name, `url(${f.url})`);
                     return font.load().then(loaded => {
-                         // @ts-ignore
-                         document.fonts.add(loaded);
+                        // @ts-ignore
+                        document.fonts.add(loaded);
                     }).catch(e => console.error(e));
                 });
                 await Promise.all(fontPromises);
@@ -68,7 +74,7 @@ export class TiramisuBrowser {
             // @ts-ignore
             window.loadedAssets = {};
             const imagePromises = assetList.map(src => new Promise(res => {
-                const img = new Image(); img.crossOrigin="Anonymous"; img.src = src;
+                const img = new Image(); img.crossOrigin = "Anonymous"; img.src = src;
                 // @ts-ignore
                 img.onload = () => { window.loadedAssets[src] = img; res(null); };
                 img.onerror = () => res(null);
@@ -77,10 +83,37 @@ export class TiramisuBrowser {
             // @ts-ignore
             window.loadedVideos = {};
             const videoPromises = videoList.map(src => new Promise(res => {
-                const vid = document.createElement('video'); vid.crossOrigin="Anonymous"; vid.src = src; vid.muted = true; vid.playsInline = true; vid.style.display = "none"; document.body.appendChild(vid);
-                // @ts-ignore
-                vid.onloadeddata = () => { window.loadedVideos[src] = vid; res(null); };
-                vid.onerror = () => res(null);
+                const vid = document.createElement('video');
+                vid.crossOrigin = "Anonymous";
+                vid.src = src;
+                vid.muted = true;
+                vid.playsInline = true;
+
+                // FIX: Force the browser to render the video by making it 'visible' but off-screen
+                vid.style.position = "absolute";
+                vid.style.top = "-9999px";
+                vid.style.left = "-9999px";
+                vid.style.width = "1px";
+                vid.style.height = "1px";
+                vid.style.opacity = "0.01";
+
+                // Add preload
+                vid.preload = "auto";
+                document.body.appendChild(vid);
+
+                vid.onloadeddata = () => {
+                    console.log(`Video Loaded Successfully: ${src}`); // Success Log
+                    // @ts-ignore
+                    window.loadedVideos[src] = vid;
+                    res(null);
+                };
+
+                vid.onerror = (e) => {
+                    // @ts-ignore
+                    const err = vid.error;
+                    console.error(`Video Failed: ${src}`, err ? `Code: ${err.code}, Msg: ${err.message}` : "");
+                    res(null);
+                };
             }));
 
             await Promise.all([...imagePromises, ...videoPromises]);
@@ -109,7 +142,7 @@ export class TiramisuBrowser {
                 await Promise.all(videoSyncPromises);
 
                 ctx.clearRect(0, 0, w, h);
-                
+
                 const currentVolume = levels[frame] || 0;
 
                 // @ts-ignore
@@ -117,7 +150,7 @@ export class TiramisuBrowser {
                     if (frame >= clip.startFrame && frame < clip.endFrame) {
                         const localFrame = frame - clip.startFrame;
                         const duration = clip.endFrame - clip.startFrame;
-                        
+
                         clip.fn({
                             frame,
                             progress: frame / (totalFrames - 1 || 1),

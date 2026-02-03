@@ -325,6 +325,7 @@ var bCtx = bufferCanvas.getContext("2d");
 bufferCanvas.width = 1280;
 bufferCanvas.height = 720;
 var currentVideoUrl = null;
+var selectedFile = null;
 var player = new TiramisuPlayer({
   width: 1280,
   height: 720,
@@ -352,6 +353,7 @@ videoInput.addEventListener("change", async (e) => {
   const file = e.target.files?.[0];
   if (!file)
     return;
+  selectedFile = file;
   if (currentVideoUrl)
     URL.revokeObjectURL(currentVideoUrl);
   currentVideoUrl = URL.createObjectURL(file);
@@ -370,6 +372,41 @@ videoInput.addEventListener("change", async (e) => {
   await player.load();
   player.seek(0);
   alert(`Video Loaded: ${tempVideo.duration.toFixed(2)}s`);
+});
+var btnRender = document.getElementById("btn-render");
+btnRender.addEventListener("click", async () => {
+  if (!selectedFile) {
+    alert("Please upload a video first!");
+    return;
+  }
+  btnRender.disabled = true;
+  btnRender.innerText = "⏳ Uploading & Rendering...";
+  try {
+    const formData = new FormData;
+    formData.append("video", selectedFile);
+    formData.append("fps", "30");
+    formData.append("duration", "5");
+    const response = await fetch("/api/export", {
+      method: "POST",
+      body: formData
+    });
+    if (!response.ok)
+      throw new Error("Render failed");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "tiramisu-video-export.mp4";
+    a.click();
+    URL.revokeObjectURL(url);
+    alert("✅ Export Successful!");
+  } catch (e) {
+    console.error(e);
+    alert("❌ Error rendering.");
+  } finally {
+    btnRender.disabled = false;
+    btnRender.innerText = "\uD83C\uDFAC Render MP4";
+  }
 });
 btnPlay.addEventListener("click", () => {
   const isPlaying = player.isPlaying;
