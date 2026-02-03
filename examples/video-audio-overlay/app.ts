@@ -34,10 +34,10 @@ let player = new TiramisuPlayer({
 });
 
 function setupClips() {
-    // 1. Background Video
-    player.addClip(0, 300, ({ ctx, width, height, videos, data }) => {
+    // 1. Background Video Layer
+    player.addClip(0, 600, ({ ctx, width, height, videos, data, utils }) => {
         ctx.fillStyle = "black";
-        ctx.fillRect(0,0, width, height);
+        ctx.fillRect(0, 0, width, height);
 
         if (!data.videoUrl) {
             ctx.strokeStyle = "#333";
@@ -56,59 +56,41 @@ function setupClips() {
 
         const vid = videos[data.videoUrl];
         if (vid && vid.readyState >= 1) {
-            if (vid.muted) vid.muted = false; 
-
-            // Aspect Fit (Contain)
-            const vidRatio = vid.videoWidth / vid.videoHeight;
-            const canvasRatio = width / height;
-            
-            let drawW = width;
-            let drawH = height;
-            let offsetX = 0;
-            let offsetY = 0;
-
-            if (canvasRatio > vidRatio) {
-                drawW = height * vidRatio;
-                offsetX = (width - drawW) / 2;
-            } else {
-                drawH = width / vidRatio;
-                offsetY = (height - drawH) / 2;
-            }
-
-            ctx.drawImage(vid, offsetX, offsetY, drawW, drawH);
+            // Use drawMediaFit to ensure 1:1 match with server-side letterboxing
+            utils.drawMediaFit(ctx, vid, width, height);
         } else {
             ctx.fillStyle = "white";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText("Loading...", width/2, height/2);
+            ctx.fillText("Loading Video...", width/2, height/2);
         }
     }, 0);
 
-    // 2. Overlay Layer (Synced with Server Logic)
-    player.addClip(0, 300, ({ ctx, width, height, frame, fps, utils, data }) => {
+    // 2. High-Fidelity UI Overlay (Matches Server Exactly)
+    player.addClip(0, 600, ({ ctx, width, height, frame, fps, utils, data }) => {
         
-        // --- 1. Timing (Absolute Seconds) ---
-        // We use frame/fps to get absolute seconds. This decouples animation speed from video length.
+        // --- 1. Timing Architecture ---
         const currentTime = frame / fps;
         const entranceDuration = 1.0; 
         const t = Math.min(currentTime / entranceDuration, 1);
         const easedT = utils.easeOutCubic(t);
 
-        // --- 2. Layout (Safe Zones) ---
+        // --- 2. Layout Architecture (Safe Zones) ---
         const safeMarginBottom = height * 0.12; 
         const cardHeight = 140;
-        const cardWidth = Math.min(width * 0.85, 600); // Responsive width with max cap
+        const cardWidth = Math.min(width * 0.85, 600); 
         
         const x = (width - cardWidth) / 2;
         const targetY = height - safeMarginBottom - cardHeight;
         const startY = height + 20;
         const y = utils.lerp(startY, targetY, easedT);
 
-        // --- 3. Drawing ---
+        // --- 3. Drawing: Card Shadow ---
         ctx.shadowColor = "rgba(0,0,0,0.4)";
         ctx.shadowBlur = 30;
         ctx.shadowOffsetY = 10;
 
+        // --- 4. Drawing: Card Body ---
         ctx.fillStyle = "white";
         utils.drawRoundedRect(ctx, x, y, cardWidth, cardHeight, 20);
         ctx.fill();
@@ -117,22 +99,19 @@ function setupClips() {
         ctx.shadowBlur = 0;
         ctx.shadowOffsetY = 0;
 
-        // Accent
-        const stripWidth = 8;
+        // --- 5. Drawing: Accent Strip ---
         ctx.fillStyle = data.color;
         ctx.save();
         ctx.beginPath();
         utils.drawRoundedRect(ctx, x, y, cardWidth, cardHeight, 20);
         ctx.clip();
-        ctx.fillRect(x, y, stripWidth + 20, cardHeight);
+        ctx.fillRect(x, y, 28, cardHeight);
         ctx.restore();
 
-        // Text
+        // --- 6. Drawing: Text Content ---
         const contentX = x + 45;
         const centerY = y + (cardHeight / 2);
 
-        // Responsive Font Calculation
-        // Use system fonts that are guaranteed to exist
         ctx.fillStyle = "#0f172a";
         ctx.font = "800 42px 'Segoe UI', Roboto, sans-serif";
         ctx.textBaseline = "bottom";
@@ -224,29 +203,25 @@ btnPlay.addEventListener("click", () => {
     if (isPlaying) {
         player.pause();
         btnPlay.innerHTML = "▶ Play Preview";
-        btnPlay.style.background = "";
     } else {
         player.play();
         btnPlay.innerHTML = "⏸ Pause Preview";
-        btnPlay.style.background = "#d97706";
     }
 });
 
 btnRender.addEventListener("click", async () => {
     if (!appState.videoFile) return;
     btnRender.disabled = true;
-    btnRender.innerText = "⏳ Uploading...";
-    statusEl.innerText = "🚀 Processing on server...";
+    btnRender.innerText = "⏳ Rendering...";
 
     try {
         const formData = new FormData();
         formData.append("video", appState.videoFile);
-        formData.append("fps", "30");
-        formData.append("duration", appState.duration.toString());
-        formData.append("width", appState.width.toString());
-        formData.append("height", appState.height.toString());
         formData.append("text", appState.text);
         formData.append("color", appState.color);
+        formData.append("width", appState.width.toString());
+        formData.append("height", appState.height.toString());
+        formData.append("duration", appState.duration.toString());
 
         const response = await fetch("/api/export", { method: "POST", body: formData });
         if (!response.ok) throw new Error("Render failed");
@@ -255,10 +230,8 @@ btnRender.addEventListener("click", async () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `tiramisu_${appState.width}x${appState.height}.mp4`;
-        document.body.appendChild(a);
+        a.download = `tiramisu_render.mp4`;
         a.click();
-        document.body.removeChild(a);
         URL.revokeObjectURL(url);
         statusEl.innerText = "✨ Download Started!";
     } catch (e) {

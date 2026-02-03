@@ -25,18 +25,12 @@ export class TiramisuBrowser {
 
         await this.page.evaluate(async (clipList, w, h, injectedData, assetList, videoKeyList, levels) => {
             const win = window as any;
-            
-            // PIN CANVAS TO TOP LEFT
-            document.body.style.margin = "0";
-            document.body.style.padding = "0";
-            document.body.style.overflow = "hidden";
-            document.body.style.backgroundColor = "black";
+            document.body.style.margin = "0"; document.body.style.padding = "0";
+            document.body.style.overflow = "hidden"; document.body.style.backgroundColor = "black";
 
             const canvas = document.createElement('canvas');
             canvas.width = w; canvas.height = h;
-            canvas.style.position = "absolute";
-            canvas.style.top = "0";
-            canvas.style.left = "0";
+            canvas.style.position = "absolute"; canvas.style.top = "0"; canvas.style.left = "0";
             document.body.appendChild(canvas);
             
             win.loadedAssets = {};
@@ -55,14 +49,11 @@ export class TiramisuBrowser {
 
             win.renderFrame = async (frame: number, fps: number, totalFrames: number, vMap: Record<string, string>) => {
                 const ctx = canvas.getContext('2d')!;
-                
-                // Virtual Video Sync
                 await Promise.all(Object.entries(vMap).map(([key, path]) => {
                     return new Promise(res => {
                         const img = win.loadedVideos[key];
                         if (img.src.includes(path)) return res(null);
-                        img.onload = () => res(null);
-                        img.src = path;
+                        img.onload = () => res(null); img.src = path;
                     });
                 }));
 
@@ -74,10 +65,7 @@ export class TiramisuBrowser {
                             progress: frame / (totalFrames - 1 || 1),
                             localProgress: (frame - clip.startFrame) / (clip.endFrame - clip.startFrame - 1 || 1),
                             audioVolume: levels[frame] || 0,
-                            data: injectedData,
-                            assets: win.loadedAssets,
-                            videos: win.loadedVideos,
-                            utils: win.TiramisuUtils
+                            data: injectedData, assets: win.loadedAssets, videos: win.loadedVideos, utils: win.TiramisuUtils
                         });
                     }
                 }
@@ -89,7 +77,6 @@ export class TiramisuBrowser {
         await this.page!.evaluate(async (f, r, tf, vm) => {
             await (window as any).renderFrame(f, r, tf, vm);
         }, frame, fps, totalFrames, vMap);
-        // Screenshot specifically the viewport which now contains only the top-left canvas
         return await this.page!.screenshot({ type: "png", omitBackground: true }) as Uint8Array;
     }
 

@@ -1,6 +1,3 @@
-/**
- * Utility functions available to both the Server (Puppeteer) and Client (Browser).
- */
 export const TiramisuUtils = {
     lerp: (start: number, end: number, t: number) => start * (1 - t) + end * t,
     clamp: (val: number, min: number, max: number) => Math.min(Math.max(val, min), max),
@@ -9,15 +6,13 @@ export const TiramisuUtils = {
     },
     toRad: (deg: number) => deg * (Math.PI / 180),
 
-    // --- Easing ---
     easeInQuad: (t: number) => t * t,
     easeOutQuad: (t: number) => t * (2 - t),
     easeInOutQuad: (t: number) => t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
     easeInCubic: (t: number) => t * t * t,
     easeOutCubic: (t: number) => (--t) * t * t + 1,
     easeOutBounce: (t: number) => {
-        const n1 = 7.5625;
-        const d1 = 2.75;
+        const n1 = 7.5625; const d1 = 2.75;
         if (t < 1 / d1) return n1 * t * t;
         else if (t < 2 / d1) return n1 * (t -= 1.5 / d1) * t + 0.75;
         else if (t < 2.5 / d1) return n1 * (t -= 2.25 / d1) * t + 0.9375;
@@ -25,54 +20,64 @@ export const TiramisuUtils = {
     },
 
     drawRoundedRect: (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
-        if (w < 2 * r) r = w / 2;
-        if (h < 2 * r) r = h / 2;
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.arcTo(x + w, y, x + w, y + h, r);
-        ctx.arcTo(x + w, y + h, x, y + h, r);
-        ctx.arcTo(x, y + h, x, y, r);
-        ctx.arcTo(x, y, x + w, y, r);
-        ctx.closePath();
+        if (w < 2 * r) r = w / 2; if (h < 2 * r) r = h / 2;
+        ctx.beginPath(); ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
     },
 
     /**
-     * PIXEL-PERFECT CENTERING
-     * Draws media covering the target size, anchored to the center.
+     * FIT (CONTAIN) MODE
+     * Scales media to fit entirely within target dimensions with letterboxing.
+     * Perfect for vertical videos in landscape canvases.
      */
-    drawMediaCover: (ctx: CanvasRenderingContext2D, media: CanvasImageSource, targetW: number, targetH: number) => {
+    drawMediaFit: (ctx: CanvasRenderingContext2D, media: CanvasImageSource, targetW: number, targetH: number) => {
         if (!media) return;
-        
-        let sw = 0;
-        let sh = 0;
-
-        if (media instanceof HTMLVideoElement) {
-            sw = media.videoWidth;
-            sh = media.videoHeight;
-        } else if (media instanceof HTMLImageElement) {
-            sw = media.naturalWidth || media.width;
-            sh = media.naturalHeight || media.height;
-        }
-
+        let sw = 0, sh = 0;
+        if (media instanceof HTMLVideoElement) { sw = media.videoWidth; sh = media.videoHeight; }
+        else if (media instanceof HTMLImageElement) { sw = media.naturalWidth || media.width; sh = media.naturalHeight || media.height; }
         if (sw === 0 || sh === 0) return;
 
         const targetRatio = targetW / targetH;
         const sourceRatio = sw / sh;
-
         let dw, dh, dx, dy;
 
         if (sourceRatio > targetRatio) {
-            dh = targetH;
-            dw = targetH * sourceRatio;
-            dx = (targetW - dw) / 2;
-            dy = 0;
-        } else {
             dw = targetW;
             dh = targetW / sourceRatio;
             dx = 0;
             dy = (targetH - dh) / 2;
+        } else {
+            dh = targetH;
+            dw = targetH * sourceRatio;
+            dx = (targetW - dw) / 2;
+            dy = 0;
         }
+        ctx.drawImage(media, dx, dy, dw, dh);
+    },
 
+    /**
+     * COVER MODE
+     * Scales media to fill the entire target area.
+     */
+    drawMediaCover: (ctx: CanvasRenderingContext2D, media: CanvasImageSource, targetW: number, targetH: number) => {
+        if (!media) return;
+        let sw = 0, sh = 0;
+        if (media instanceof HTMLVideoElement) { sw = media.videoWidth; sh = media.videoHeight; }
+        else if (media instanceof HTMLImageElement) { sw = media.naturalWidth || media.width; sh = media.naturalHeight || media.height; }
+        if (sw === 0 || sh === 0) return;
+
+        const targetRatio = targetW / targetH;
+        const sourceRatio = sw / sh;
+        let dw, dh, dx, dy;
+
+        if (sourceRatio > targetRatio) {
+            dh = targetH; dw = targetH * sourceRatio;
+            dx = (targetW - dw) / 2; dy = 0;
+        } else {
+            dw = targetW; dh = targetW / sourceRatio;
+            dx = 0; dy = (targetH - dh) / 2;
+        }
         ctx.drawImage(media, dx, dy, dw, dh);
     }
 };
@@ -90,6 +95,7 @@ window.TiramisuUtils = {
     easeOutCubic: ${TiramisuUtils.easeOutCubic.toString()},
     easeOutBounce: ${TiramisuUtils.easeOutBounce.toString()},
     drawRoundedRect: ${TiramisuUtils.drawRoundedRect.toString()},
+    drawMediaFit: ${TiramisuUtils.drawMediaFit.toString()},
     drawMediaCover: ${TiramisuUtils.drawMediaCover.toString()}
 };
 `;
