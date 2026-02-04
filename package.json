@@ -33,6 +33,9 @@
     "build:visualizer": "bun run build:wasm && bun build ./examples/music-visualizer/app.ts --target browser --outfile ./examples/music-visualizer/bundle.js $BASE_EXTERNAL",
     "dev:visualizer": "bun run build:visualizer && bun run examples/serve.ts",
     
+    "build:meme": "bun build ./examples/meme-generator/app.ts --target browser --outfile ./examples/meme-generator/bundle.js --external \"./src/Tiramisu\" --external \"./src/Server\" --external \"./src/Browser\" --external \"./src/Encoder\" --external \"./src/CLI\" --external \"./src/AudioAnalysis\" --external \"puppeteer\"",
+    "dev:meme": "bun run build:meme && bun run examples/serve.ts",
+    
     "start:server": "bun run examples/serve.ts"
   },
   "dependencies": {
