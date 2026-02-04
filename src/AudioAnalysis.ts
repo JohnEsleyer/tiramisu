@@ -1,41 +1,49 @@
 import { spawn } from "bun";
+import { join, isAbsolute } from 'path';
+import { existsSync } from 'fs';
+
+// Remove top-level WASM import to prevent crash if build:visualizer wasn't run
+// import { AudioVisualizer } from './wasm/tiramisu_audio_analyzer'; 
 
 export class AudioAnalyzer {
-    /**
-     * Extracts volume levels (RMS) per frame from an audio file.
-     * Returns an array of numbers between 0 and 1.
-     */
-    public async analyze(audioFile: string, fps: number, durationSeconds: number): Promise<number[]> {
-        console.log("   🎵 Analyzing Audio...");
+    public async analyze(audioFile: string, fps: number, durationSeconds: number): Promise<{ rms: number, bands: number[] }[]> {
+        
+        // 1. DYNAMIC IMPORT: Load WASM only when analyze is actually called
+        let AudioVisualizer;
+        try {
+            // @ts-ignore
+            const module = await import('./wasm/tiramisu_audio_analyzer');
+            AudioVisualizer = module.AudioVisualizer;
+        } catch (e) {
+            console.warn("   ⚠️ WASM Audio Module not found. Running in 'silent' mode.");
+            console.warn("   👉 Run 'bun run build:visualizer' to enable audio reactivity.");
+            const totalFrames = Math.ceil(fps * durationSeconds);
+            return Array(totalFrames).fill({ rms: 0, bands: Array(32).fill(0) });
+        }
+
+        console.log(`   🎵 Analyzing Audio (DC Filtered + Web Audio Physics): ${audioFile}`);
+
+        const absolutePath = isAbsolute(audioFile) ? audioFile : join(process.cwd(), audioFile);
+        if (!existsSync(absolutePath)) return [];
 
         const sampleRate = 44100;
         const totalFrames = Math.ceil(fps * durationSeconds);
         const samplesPerFrame = Math.floor(sampleRate / fps);
+        const BANDS_COUNT = 32; 
         
-        // We spawn FFmpeg to output raw 16-bit Little Endian PCM mono audio
         const ffmpegArgs = [
-            "ffmpeg",
-            "-i", audioFile,
-            "-ac", "1",              // Downmix to mono
-            "-ar", sampleRate.toString(), // Set sample rate
-            "-f", "s16le",           // Output raw PCM 16-bit
-            "-acodec", "pcm_s16le",  // Codec
-            "-t", durationSeconds.toString(), // Limit duration
-            "-"                      // Pipe to stdout
+            "ffmpeg", "-i", absolutePath,
+            "-ac", "1", "-ar", sampleRate.toString(), 
+            "-f", "s16le", "-acodec", "pcm_s16le",  
+            "-t", durationSeconds.toString(), "-"
         ];
 
-        const proc = spawn(ffmpegArgs, {
-            stdout: "pipe",
-            stderr: "ignore" // We don't need logs here
-        });
-
-        const stream = proc.stdout;
-        const reader = stream.getReader();
+        const proc = spawn(ffmpegArgs, { stdout: "pipe", stderr: "inherit" });
+        const reader = proc.stdout.getReader();
         
         let chunks: Uint8Array[] = [];
         let totalLength = 0;
 
-        // Read all data into memory (audio is small enough)
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -43,7 +51,8 @@ export class AudioAnalyzer {
             totalLength += value.length;
         }
 
-        // Merge chunks
+        if (totalLength === 0) return Array(totalFrames).fill({ rms: 0, bands: Array(BANDS_COUNT).fill(0) });
+
         const fullBuffer = new Uint8Array(totalLength);
         let offset = 0;
         for (const chunk of chunks) {
@@ -51,44 +60,33 @@ export class AudioAnalyzer {
             offset += chunk.length;
         }
 
-        // Process samples
-        // 16-bit audio = 2 bytes per sample
-        const dataView = new DataView(fullBuffer.buffer);
+        // Initialize from the dynamically imported module
+        const visualizer = new AudioVisualizer();
+        const fullInt16Array = new Int16Array(fullBuffer.buffer);
+        const analysisData: { rms: number, bands: number[] }[] = [];
         const totalSamples = Math.floor(totalLength / 2);
-        const levels: number[] = [];
 
         for (let f = 0; f < totalFrames; f++) {
             const startSample = f * samplesPerFrame;
-            let sumSquares = 0;
-            let count = 0;
+            const endSample = Math.min(startSample + samplesPerFrame, totalSamples);
+            const frameSamples = fullInt16Array.slice(startSample, endSample);
+            
+            const bandsFloat = visualizer.process_frame(frameSamples);
+            const bands = Array.from(bandsFloat) as number[];
 
-            for (let i = 0; i < samplesPerFrame; i++) {
-                const sampleIdx = startSample + i;
-                if (sampleIdx >= totalSamples) break;
-
-                // Read 16-bit signed integer (-32768 to 32767)
-                const sample = dataView.getInt16(sampleIdx * 2, true);
-                
-                // Normalize to -1 to 1
-                const norm = sample / 32768.0;
-                sumSquares += norm * norm;
-                count++;
+            let sumSq = 0;
+            for(let i=0; i<frameSamples.length; i++) {
+                const val = frameSamples[i] / 32768.0;
+                sumSq += val * val;
             }
+            const rms = Math.min(Math.sqrt(sumSq / (frameSamples.length || 1)) * 2.0, 1.0);
 
-            if (count > 0) {
-                // RMS (Root Mean Square)
-                const rms = Math.sqrt(sumSquares / count);
-                levels.push(rms);
-            } else {
-                levels.push(0);
-            }
+            analysisData.push({ rms, bands });
         }
 
-        // Normalize the entire array so the loudest frame is 1.0 (optional, but good for vis)
-        const maxLevel = Math.max(...levels) || 1;
-        const normalizedLevels = levels.map(l => l / maxLevel);
+        if ((visualizer as any).free) (visualizer as any).free();
 
-        console.log(`   📊 Audio Analyzed: ${normalizedLevels.length} frames.`);
-        return normalizedLevels;
+        console.log(`   📊 Audio Analyzed: ${analysisData.length} frames.`);
+        return analysisData;
     }
 }

@@ -3,7 +3,7 @@ import { spawn } from "bun";
 export class TiramisuEncoder {
     private process: any;
 
-    constructor(fps: number, outputFile: string, audioFile?: string) {
+    constructor(fps: number, outputFile: string, audioFile?: string, durationSeconds?: number) { // ADD durationSeconds
         const ffmpegArgs = [
             "ffmpeg", "-y",
             "-f", "image2pipe",
@@ -28,6 +28,12 @@ export class TiramisuEncoder {
             // We remove -shortest to prevent early exits if audio metadata is weird.
             ffmpegArgs.push("-map", "0:v:0", "-map", "1:a:0?", "-c:a", "aac");
         }
+        
+        // --- CRITICAL FIX: Enforce the output duration
+        if (durationSeconds) {
+            ffmpegArgs.push("-t", durationSeconds.toString());
+        }
+        // --- END CRITICAL FIX ---
 
         ffmpegArgs.push(outputFile);
 

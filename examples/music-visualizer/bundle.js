@@ -377,16 +377,22 @@ class TiramisuPlayer {
   }
 }
 
-// examples/split-screen/app.ts
+// examples/music-visualizer/app.ts
+var canvasId = "preview-canvas";
+var videoInput = document.getElementById("video-input");
+var audioInput = document.getElementById("audio-input");
+var btnPlay = document.getElementById("btn-play");
+var btnRender = document.getElementById("btn-render");
+var statusEl = document.getElementById("status");
 var appState = {
   width: 1280,
   height: 720,
-  wipe: 0.5,
-  videoA: null,
-  videoB: null,
-  duration: 5
+  duration: 5,
+  videoUrl: null,
+  audioUrl: null,
+  videoFile: null,
+  audioFile: null
 };
-var canvasId = "preview-canvas";
 var player = new TiramisuPlayer({
   width: appState.width,
   height: appState.height,
@@ -395,126 +401,140 @@ var player = new TiramisuPlayer({
   canvas: canvasId,
   data: appState
 });
-player.addClip(0, 600, ({ ctx, width, height, videos, data }) => {
-  ctx.fillStyle = "#111";
+var backgroundClip = ({ ctx, width, height, videos, data, utils, audioVolume }) => {
+  ctx.fillStyle = "black";
   ctx.fillRect(0, 0, width, height);
-  if (data.videoA && videos[data.videoA]) {
-    ctx.drawImage(videos[data.videoA], 0, 0, width, height);
+  if (data.videoUrl && videos[data.videoUrl]) {
+    const vid = videos[data.videoUrl];
+    if (vid.readyState >= 1) {
+      const pulseScale = 1 + audioVolume * 0.1;
+      ctx.save();
+      ctx.translate(width / 2, height / 2);
+      ctx.scale(pulseScale, pulseScale);
+      ctx.translate(-width / 2, -height / 2);
+      utils.drawMediaFit(ctx, vid, width, height);
+      ctx.restore();
+    }
   } else {
-    drawPlaceholder(ctx, "VIDEO A", width, height);
+    ctx.fillStyle = "#374151";
+    ctx.font = "bold 40px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("NO VIDEO/AUDIO LOADED", width / 2, height / 2);
   }
-}, 0);
-player.addClip(0, 600, ({ ctx, width, height, videos, data }) => {
-  if (!data.videoB || !videos[data.videoB])
-    return;
+};
+player.addClip(0, 600, backgroundClip, 0);
+var visualizerClip = ({ ctx, width, height, audioBands, audioVolume, utils }) => {
+  const barCount = audioBands.length;
+  const barWidth = width / barCount / 1.5;
+  const padding = barWidth / 2;
+  const baseHeight = height * 0.2;
+  const maxBarHeight = height * 0.3;
+  const barColor = (v) => `rgba(245, 158, 11, ${utils.clamp(v * 2, 0.2, 1)})`;
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(width * data.wipe, 0, width * (1 - data.wipe), height);
-  ctx.clip();
-  ctx.drawImage(videos[data.videoB], 0, 0, width, height);
-  ctx.restore();
-}, 1);
-player.addClip(0, 600, ({ ctx, width, height, data }) => {
-  const x = width * data.wipe;
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(x, 0);
-  ctx.lineTo(x, height);
-  ctx.stroke();
-  ctx.fillStyle = "white";
-  ctx.beginPath();
-  ctx.arc(x, height / 2, 20, 0, Math.PI * 2);
-  ctx.fill();
-}, 2);
-function drawPlaceholder(ctx, text, w, h) {
-  ctx.fillStyle = "#1e293b";
-  ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = "#475569";
-  ctx.font = "bold 40px sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(text, w / 2, h / 2);
-}
-var btnExport = document.getElementById("btn-export");
-var videoAInput = document.getElementById("video-a");
-var videoBInput = document.getElementById("video-b");
-var wipeRange = document.getElementById("wipe-range");
-var btnPlay = document.getElementById("btn-play");
-var statusEl = document.getElementById("status");
-function updateExportButtonState() {
-  if (videoAInput.files?.length && videoBInput.files?.length) {
-    btnExport.disabled = false;
-    btnExport.classList.remove("bg-slate-700", "text-slate-400", "cursor-not-allowed");
-    btnExport.classList.add("bg-pink-600", "text-white", "hover:bg-pink-700");
+  ctx.translate(padding, height - padding - 10);
+  for (let i = 0;i < barCount; i++) {
+    const bandValue = audioBands[i];
+    const h = baseHeight + bandValue * maxBarHeight;
+    const x = i * (barWidth + padding);
+    const y = -h;
+    ctx.fillStyle = barColor(bandValue);
+    utils.drawRoundedRect(ctx, x, y, barWidth, h, 5);
+    ctx.fill();
   }
+  ctx.restore();
+  const circleRadius = 50 + audioVolume * 80;
+  ctx.beginPath();
+  ctx.arc(width - 80, 80, circleRadius, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(245, 158, 11, ${utils.clamp(audioVolume * 2, 0.1, 0.8)})`;
+  ctx.fill();
+  ctx.strokeStyle = "#f59e0b";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+};
+player.addClip(0, 600, visualizerClip, 1);
+function updateControls() {
+  const ready = appState.videoFile && appState.audioFile;
+  btnPlay.disabled = !ready;
+  btnRender.disabled = !ready;
+  btnPlay.style.cursor = ready ? "pointer" : "not-allowed";
+  btnRender.style.cursor = ready ? "pointer" : "not-allowed";
 }
-videoAInput.addEventListener("change", updateExportButtonState);
-videoBInput.addEventListener("change", updateExportButtonState);
-btnExport.addEventListener("click", async () => {
-  const fileA = videoAInput.files?.[0];
-  const fileB = videoBInput.files?.[0];
-  if (!fileA || !fileB)
+async function handleFile(file, type) {
+  statusEl.innerText = `⏳ Reading ${type} file...`;
+  if (type === "video") {
+    if (appState.videoUrl)
+      URL.revokeObjectURL(appState.videoUrl);
+    appState.videoUrl = URL.createObjectURL(file);
+    appState.videoFile = file;
+    const tempVideo = document.createElement("video");
+    tempVideo.preload = "metadata";
+    tempVideo.src = appState.videoUrl;
+    await new Promise((resolve) => tempVideo.onloadedmetadata = () => {
+      appState.duration = tempVideo.duration;
+      resolve(null);
+    });
+  } else {
+    if (appState.audioUrl)
+      URL.revokeObjectURL(appState.audioUrl);
+    appState.audioUrl = URL.createObjectURL(file);
+    appState.audioFile = file;
+  }
+  if (appState.videoUrl && appState.audioUrl) {
+    player.config.durationSeconds = appState.duration;
+    player.config.videos = [appState.videoUrl];
+    player.config.audioFile = appState.audioUrl;
+    await player.load();
+    player.seek(0);
+    statusEl.innerText = `✅ Ready. Duration: ${appState.duration.toFixed(1)}s`;
+  }
+  updateControls();
+}
+videoInput.addEventListener("change", (e) => handleFile(e.target.files[0], "video"));
+audioInput.addEventListener("change", (e) => handleFile(e.target.files[0], "audio"));
+btnPlay.addEventListener("click", () => {
+  const isPlaying = player.isPlaying;
+  if (isPlaying) {
+    player.pause();
+    btnPlay.innerHTML = "▶ Play Preview";
+  } else {
+    player.play();
+    btnPlay.innerHTML = "⏸ Pause Preview";
+  }
+});
+btnRender.addEventListener("click", async () => {
+  if (!appState.videoFile || !appState.audioFile)
     return;
-  btnExport.disabled = true;
-  btnExport.innerText = "⏳ Uploading...";
-  statusEl.innerText = "\uD83D\uDE80 Processing split-screen render on server...";
+  btnRender.disabled = true;
+  btnRender.innerText = "⏳ Rendering...";
+  statusEl.innerText = "\uD83C\uDFAC Uploading files and starting server render...";
   try {
     const formData = new FormData;
-    formData.append("videoA", fileA);
-    formData.append("videoB", fileB);
-    formData.append("wipe", appState.wipe.toString());
-    formData.append("duration", appState.duration.toString());
+    formData.append("video", appState.videoFile);
+    formData.append("audio", appState.audioFile);
     formData.append("width", appState.width.toString());
     formData.append("height", appState.height.toString());
-    const response = await fetch("/api/export-split", {
+    formData.append("duration", appState.duration.toString());
+    const response = await fetch("/api/render-visualizer", {
       method: "POST",
       body: formData
     });
     if (!response.ok)
-      throw new Error("Split render failed");
+      throw new Error("Render failed");
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `comparison_render.mp4`;
+    a.download = `tiramisu_visualizer_render.mp4`;
     a.click();
     URL.revokeObjectURL(url);
-    statusEl.innerText = "✨ Render Complete!";
+    statusEl.innerText = "✨ Download Started!";
   } catch (e) {
     console.error(e);
-    statusEl.innerText = "❌ Export Failed.";
+    statusEl.innerText = "❌ Render Failed. Check server console.";
   } finally {
-    btnExport.disabled = false;
-    btnExport.innerText = "\uD83C\uDFAC Export MP4";
-    updateExportButtonState();
+    btnRender.disabled = false;
+    btnRender.innerText = "\uD83C\uDFAC Render MP4";
+    updateControls();
   }
 });
-var handleFile = async (file, key) => {
-  const url = URL.createObjectURL(file);
-  appState[key] = url;
-  const tempVid = document.createElement("video");
-  tempVid.src = url;
-  await new Promise((r) => tempVid.onloadedmetadata = r);
-  appState.duration = Math.min(appState.duration, tempVid.duration);
-  player.config.durationSeconds = appState.duration;
-  player.config.videos = [appState.videoA, appState.videoB].filter(Boolean);
-  await player.load();
-  player.seek(0);
-  statusEl.innerText = `Loaded ${file.name}`;
-};
-videoAInput.onchange = (e) => handleFile(e.target.files[0], "videoA");
-videoBInput.onchange = (e) => handleFile(e.target.files[0], "videoB");
-wipeRange.oninput = (e) => {
-  appState.wipe = parseFloat(e.target.value);
-  if (!player.isPlaying)
-    player.renderFrame(Math.floor(player.pausedAt * 30));
-};
-btnPlay.onclick = () => {
-  if (player.isPlaying) {
-    player.pause();
-    btnPlay.innerText = "▶ Play Preview";
-  } else {
-    player.play();
-    btnPlay.innerText = "⏸ Pause Preview";
-  }
-};
+updateControls();

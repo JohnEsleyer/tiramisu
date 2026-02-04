@@ -5,8 +5,10 @@ export class TiramisuServer {
     private server?: any;
 
     public start() {
+        // --- MISSING INITIALIZATION ---
         const templatePath = join(import.meta.dir, "template.html");
         const htmlContent = readFileSync(templatePath, "utf-8");
+        // --- END MISSING INITIALIZATION ---
 
         this.server = Bun.serve({
             port: 0,
@@ -25,19 +27,19 @@ export class TiramisuServer {
                     return new Response(null, { status: 404 });
                 }
 
-                // Serve static files (images, fonts) from the current working directory
+                // Serve static files (images, fonts, video frames)
                 const filePath = join(process.cwd(), url.pathname);
                 const file = Bun.file(filePath);
 
                 if (await file.exists()) {
-                    // --- ADD THIS LOG ---
-                    if (filePath.endsWith(".mp4")) {
-                        console.log(`[Server] Serving video asset: ${url.pathname}`);
+                    if (filePath.endsWith(".mp4") || filePath.endsWith(".jpg")) {
+                        console.log(`[Server] Serving Asset: ${url.pathname}`);
                     }
                     return new Response(file);
                 }
 
-                console.log(`[Server] 404 Not Found: ${url.pathname}`); // Log missing files
+                // --- CRITICAL DEBUG LOGGING ---
+                console.error(`[Server] 404 NOT FOUND: ${url.pathname} (Attempted FS Path: ${filePath})`); 
                 return new Response("Not Found", { status: 404 });
             },
         });

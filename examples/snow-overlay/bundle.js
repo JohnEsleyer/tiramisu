@@ -377,144 +377,114 @@ class TiramisuPlayer {
   }
 }
 
-// examples/split-screen/app.ts
-var appState = {
-  width: 1280,
-  height: 720,
-  wipe: 0.5,
-  videoA: null,
-  videoB: null,
-  duration: 5
-};
+// examples/snow-overlay/app.ts
 var canvasId = "preview-canvas";
-var player = new TiramisuPlayer({
-  width: appState.width,
-  height: appState.height,
-  fps: 30,
-  durationSeconds: appState.duration,
-  canvas: canvasId,
-  data: appState
-});
-player.addClip(0, 600, ({ ctx, width, height, videos, data }) => {
-  ctx.fillStyle = "#111";
-  ctx.fillRect(0, 0, width, height);
-  if (data.videoA && videos[data.videoA]) {
-    ctx.drawImage(videos[data.videoA], 0, 0, width, height);
-  } else {
-    drawPlaceholder(ctx, "VIDEO A", width, height);
-  }
-}, 0);
-player.addClip(0, 600, ({ ctx, width, height, videos, data }) => {
-  if (!data.videoB || !videos[data.videoB])
-    return;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(width * data.wipe, 0, width * (1 - data.wipe), height);
-  ctx.clip();
-  ctx.drawImage(videos[data.videoB], 0, 0, width, height);
-  ctx.restore();
-}, 1);
-player.addClip(0, 600, ({ ctx, width, height, data }) => {
-  const x = width * data.wipe;
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(x, 0);
-  ctx.lineTo(x, height);
-  ctx.stroke();
-  ctx.fillStyle = "white";
-  ctx.beginPath();
-  ctx.arc(x, height / 2, 20, 0, Math.PI * 2);
-  ctx.fill();
-}, 2);
-function drawPlaceholder(ctx, text, w, h) {
-  ctx.fillStyle = "#1e293b";
-  ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = "#475569";
-  ctx.font = "bold 40px sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(text, w / 2, h / 2);
-}
-var btnExport = document.getElementById("btn-export");
-var videoAInput = document.getElementById("video-a");
-var videoBInput = document.getElementById("video-b");
-var wipeRange = document.getElementById("wipe-range");
-var btnPlay = document.getElementById("btn-play");
 var statusEl = document.getElementById("status");
-function updateExportButtonState() {
-  if (videoAInput.files?.length && videoBInput.files?.length) {
-    btnExport.disabled = false;
-    btnExport.classList.remove("bg-slate-700", "text-slate-400", "cursor-not-allowed");
-    btnExport.classList.add("bg-pink-600", "text-white", "hover:bg-pink-700");
-  }
-}
-videoAInput.addEventListener("change", updateExportButtonState);
-videoBInput.addEventListener("change", updateExportButtonState);
-btnExport.addEventListener("click", async () => {
-  const fileA = videoAInput.files?.[0];
-  const fileB = videoBInput.files?.[0];
-  if (!fileA || !fileB)
-    return;
-  btnExport.disabled = true;
-  btnExport.innerText = "⏳ Uploading...";
-  statusEl.innerText = "\uD83D\uDE80 Processing split-screen render on server...";
-  try {
-    const formData = new FormData;
-    formData.append("videoA", fileA);
-    formData.append("videoB", fileB);
-    formData.append("wipe", appState.wipe.toString());
-    formData.append("duration", appState.duration.toString());
-    formData.append("width", appState.width.toString());
-    formData.append("height", appState.height.toString());
-    const response = await fetch("/api/export-split", {
-      method: "POST",
-      body: formData
-    });
-    if (!response.ok)
-      throw new Error("Split render failed");
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `comparison_render.mp4`;
-    a.click();
-    URL.revokeObjectURL(url);
-    statusEl.innerText = "✨ Render Complete!";
-  } catch (e) {
-    console.error(e);
-    statusEl.innerText = "❌ Export Failed.";
-  } finally {
-    btnExport.disabled = false;
-    btnExport.innerText = "\uD83C\uDFAC Export MP4";
-    updateExportButtonState();
+var btnPlay = document.getElementById("btn-play");
+var btnRender = document.getElementById("btn-render");
+var DURATION = 6;
+var FPS = 30;
+var PARTICLE_COUNT = 300;
+var RENDER_WIDTH = 1280;
+var RENDER_HEIGHT = 720;
+var RANDOM_SEED = 12345;
+var player = new TiramisuPlayer({
+  width: RENDER_WIDTH,
+  height: RENDER_HEIGHT,
+  fps: FPS,
+  durationSeconds: DURATION,
+  canvas: canvasId,
+  data: {
+    particleCount: PARTICLE_COUNT,
+    randomSeed: RANDOM_SEED,
+    totalDuration: DURATION,
+    maxParticleSpeed: 100
   }
 });
-var handleFile = async (file, key) => {
-  const url = URL.createObjectURL(file);
-  appState[key] = url;
-  const tempVid = document.createElement("video");
-  tempVid.src = url;
-  await new Promise((r) => tempVid.onloadedmetadata = r);
-  appState.duration = Math.min(appState.duration, tempVid.duration);
-  player.config.durationSeconds = appState.duration;
-  player.config.videos = [appState.videoA, appState.videoB].filter(Boolean);
-  await player.load();
-  player.seek(0);
-  statusEl.innerText = `Loaded ${file.name}`;
+player.addClip(0, DURATION, ({ ctx, width, height }) => {
+  const grad = ctx.createLinearGradient(0, 0, 0, height);
+  grad.addColorStop(0, "#0e131f");
+  grad.addColorStop(1, "#1c253c");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+}, 0);
+var snowClip = ({ ctx, width, height, frame, fps, data, utils }) => {
+  const masterRNG = utils.seededRandomGenerator(data.randomSeed);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+  ctx.shadowBlur = 4;
+  ctx.shadowColor = "white";
+  for (let i = 0;i < data.particleCount; i++) {
+    const particleSeed = data.randomSeed + i;
+    const pRNG = utils.seededRandomGenerator(particleSeed);
+    const startX = pRNG() * width;
+    const startY = pRNG() * height;
+    const size = utils.lerp(1, 3, pRNG());
+    const fallSpeed = utils.lerp(10, data.maxParticleSpeed, size / 3);
+    const windAmplitude = utils.lerp(20, 80, pRNG());
+    const windFrequency = utils.lerp(0.5, 1.5, pRNG());
+    const currentTime = frame / fps;
+    const yTravel = fallSpeed * currentTime;
+    const y = (startY + yTravel) % height;
+    const normalizedTime = currentTime / data.totalDuration;
+    const xDrift = Math.sin(normalizedTime * Math.PI * 2 * windFrequency) * windAmplitude;
+    const x = startX + xDrift;
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
 };
-videoAInput.onchange = (e) => handleFile(e.target.files[0], "videoA");
-videoBInput.onchange = (e) => handleFile(e.target.files[0], "videoB");
-wipeRange.oninput = (e) => {
-  appState.wipe = parseFloat(e.target.value);
-  if (!player.isPlaying)
-    player.renderFrame(Math.floor(player.pausedAt * 30));
-};
-btnPlay.onclick = () => {
-  if (player.isPlaying) {
+player.addClip(0, DURATION, snowClip, 1);
+btnPlay.addEventListener("click", () => {
+  const isPlaying = player.isPlaying;
+  if (isPlaying) {
     player.pause();
     btnPlay.innerText = "▶ Play Preview";
   } else {
     player.play();
     btnPlay.innerText = "⏸ Pause Preview";
   }
-};
+});
+btnRender.addEventListener("click", async () => {
+  btnRender.disabled = true;
+  btnRender.innerText = "⏳ Rendering...";
+  statusEl.innerText = "\uD83C\uDFAC Sending render job to server...";
+  try {
+    const payload = {
+      width: RENDER_WIDTH,
+      height: RENDER_HEIGHT,
+      fps: FPS,
+      duration: DURATION,
+      particleCount: PARTICLE_COUNT,
+      randomSeed: RANDOM_SEED,
+      maxParticleSpeed: 100
+    };
+    const response = await fetch("/api/render-snow", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok)
+      throw new Error("Server render failed");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `snow_overlay_render.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    statusEl.innerText = "✨ Success! Check your downloads.";
+  } catch (err) {
+    console.error(err);
+    statusEl.innerText = "❌ Error during render/download.";
+  } finally {
+    btnRender.disabled = false;
+    btnRender.innerText = "\uD83C\uDFAC Render MP4";
+  }
+});
+player.load().then(() => {
+  statusEl.innerText = "✅ Ready to play.";
+  player.seek(0);
+});
