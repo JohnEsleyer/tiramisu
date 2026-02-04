@@ -1,30 +1,37 @@
 
 # 🍰 Tiramisu
 
-**Tiramisu** is a high-performance, programmatic video creation engine built on [Bun](https://bun.sh). It allows you to generate high-quality MP4 videos and interactive web previews using a single, unified HTML5 Canvas API.
+**Tiramisu** is a high-performance, programmatic video creation engine built on [Bun](https://bun.sh). It bridges the gap between the browser and the server, allowing you to build complex video compositions using the familiar HTML5 Canvas API and render them into high-quality MP4s.
 
-Unlike heavier frameworks, Tiramisu features a zero-disk-waste pipeline that streams frames directly into FFmpeg while providing a lightweight client-side player for real-time editing and previews.
+Unlike traditional video frameworks, Tiramisu features a **zero-disk-waste pipeline**: Puppeteer screenshots are streamed directly into FFmpeg via STDIN, while a lightweight client-side player provides real-time previews for rapid development.
 
 ## 🔗 Repository
 [github.com/JohnEsleyer/tiramisu](https://github.com/JohnEsleyer/tiramisu)
 
 ## ✨ Key Features
 
-- **Unified API**: Use the exact same `addClip()` logic for both your server-side renders and frontend live previews.
-- **Live Preview Player**: Built-in `TiramisuPlayer` for the browser with support for scrubbing, play/pause, and real-time playback.
-- **Timeline System**: Modular organization of animations with specific timing and layering (z-index).
-- **Audio Reactivity**: Built-in audio analyzer providing real-time volume data (`audioVolume`) for reactive visuals in both Puppeteer and the browser.
-- **Asset Preloading**: Automatic preloading for Images, Videos, and Custom Fonts (Google Fonts or local).
-- **Animation Toolbox**: Built-in Easing functions (Bounce, Elastic, etc.), Lerp, Text Wrapping, and Rounded Shapes.
-- **Zero-Disk Rendering**: Puppeteer screenshots are piped directly to FFmpeg via STDIN.
+- **Unified API**: Write your drawing logic once; run it in the browser for live previews and on the server for final rendering.
+- **Audio Reactivity (WASM)**: High-fidelity audio analysis providing real-time RMS volume and frequency bands (FFT) via a Rust-powered WASM module.
+- **Dynamic Asset Pipeline**: Automatic preloading for Images, Fonts (Google/Local), and Videos (synchronized frame-by-frame).
+- **Interactive Preview Player**: Built-in `TiramisuPlayer` for the browser with support for scrubbing, play/pause, and real-time state updates.
+- **Animation Toolbox**: 
+    - **Easings**: Bounce, Cubic, Expo, etc.
+    - **Masking**: Advanced Luma/Stencil masking (video-in-text, shapes).
+    - **Deterministic RNG**: Seeded random generators for consistent particle systems (e.g., snow, rain).
+    - **Layout**: `drawMediaFit` and `drawMediaCover` helpers for responsive media.
 
 ## 🛠 Prerequisites
 
-Tiramisu requires **FFmpeg** to be installed on your system to encode the final video:
+- **Bun**: The runtime.
+- **FFmpeg**: Required for encoding the final video.
+- **Rust (Optional)**: Only required if you wish to modify/rebuild the audio analyzer WASM.
 
-- **macOS**: `brew install ffmpeg`
-- **Linux**: `sudo apt install ffmpeg`
-- **Windows**: `winget install FFmpeg`
+```bash
+# macOS
+brew install ffmpeg
+# Linux
+sudo apt install ffmpeg
+```
 
 ## 📦 Installation
 
@@ -35,67 +42,82 @@ Tiramisu requires **FFmpeg** to be installed on your system to encode the final 
    bun install
    ```
 
-2. **Run the Interactive Editor Demo:**
+2. **Build the Audio Analyzer (Required for Visualizers):**
    ```bash
-   bun run dev:editor
+   bun run build:wasm
    ```
-   *Then open `http://localhost:3000/examples/video-editor/index.html` in your browser.*
+
+3. **Try an Example:**
+   ```bash
+   bun run dev:visualizer  # Music Visualizer
+   bun run dev:meme        # Meme Generator with Drag & Drop
+   bun run dev:snow        # Deterministic Snow Overlay
+   ```
 
 ## 🎬 Quick Start
 
-### 1. Backend Rendering (Server)
-Generate a high-quality MP4 file.
+### 1. Unified Drawing Logic
+The core of Tiramisu is the `DrawFunction`. It receives a `context` containing the Canvas 2D API, timing info, and audio data.
 
 ```typescript
-import { Tiramisu } from "./src/Tiramisu";
+const myClip = ({ ctx, width, height, localProgress, audioVolume, utils }) => {
+    // Fill background
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(0, 0, width, height);
+    
+    // Animate a circle based on audio volume
+    const radius = 50 + (audioVolume * 100);
+    ctx.beginPath();
+    ctx.arc(width/2, height/2, radius, 0, Math.PI * 2);
+    ctx.fillStyle = "#38bdf8";
+    ctx.fill();
+};
+```
+
+### 2. Live Preview (Client-Side)
+Ideal for editors and dashboards.
+```typescript
+import { TiramisuPlayer } from "tiramisu/client";
+
+const player = new TiramisuPlayer({
+    width: 1280, height: 720, fps: 60,
+    durationSeconds: 5, canvas: "my-canvas-id"
+});
+
+player.addClip(0, 5, myClip);
+await player.load();
+player.play();
+```
+
+### 3. Final Render (Server-Side)
+Pipes frames to FFmpeg to generate an `.mp4`.
+```typescript
+import { Tiramisu } from "tiramisu";
 
 const engine = new Tiramisu({
     width: 1280, height: 720, fps: 30,
     durationSeconds: 5, outputFile: "output.mp4"
 });
 
-engine.addClip(0, 5, ({ ctx, width, height, localProgress, utils }) => {
-    ctx.fillStyle = "#1a1a1a";
-    ctx.fillRect(0, 0, width, height);
-    
-    ctx.font = "bold 60px sans-serif";
-    ctx.fillStyle = "white";
-    ctx.fillText("🍰 Tiramisu Render", 100, 100);
-});
-
+engine.addClip(0, 5, myClip);
 await engine.render();
-```
-
-### 2. Live Preview (Client)
-Run the animation in a web browser for an interactive editor.
-
-```typescript
-import { TiramisuPlayer } from "./src/Client";
-
-const player = new TiramisuPlayer({
-    width: 1280, height: 720, fps: 60,
-    durationSeconds: 5, canvas: "preview-canvas"
-});
-
-// The exact same clip logic as above!
-player.addClip(0, 5, ({ ctx, width, height }) => {
-    /* ... same code ... */
-});
-
-await player.load();
-player.play();
 ```
 
 ## 🧠 Architecture
 
-Tiramisu is designed with a modular separation of concerns:
+1.  **The Server (`Tiramisu.ts`)**: Orchestrates the headless browser (Puppeteer) and the encoder (FFmpeg).
+2.  **The Analyzer (`AudioAnalysis.ts`)**: Uses a **Rust/WASM** module to perform FFT and RMS analysis on audio files, mirroring Web Audio API behavior on the server.
+3.  **The Video Manager (`VideoManager.ts`)**: Extracts video frames into a local cache to ensure frame-accurate synchronization during headless rendering.
+4.  **The Utils (`Utils.ts`)**: A shared library injected into both Puppeteer and the Browser Player to ensure math and drawing functions are identical across environments.
+5.  **The Encoder (`Encoder.ts`)**: Automatically detects hardware acceleration (NVENC, VideoToolbox) for faster-than-realtime encoding.
 
-1. **The Server (`Tiramisu.ts`)**: The core engine that orchestrates the Puppeteer-to-FFmpeg pipeline.
-2. **The Player (`Client.ts`)**: A browser-native implementation using `requestAnimationFrame` and Web Audio API for live previews.
-3. **The Browser (`Browser.ts`)**: Manages the Puppeteer instance for frame-accurate headless rendering.
-4. **The Encoder (`Encoder.ts`)**: Manages the FFmpeg process that converts raw data into the final video file.
-5. **The Utilities (`Utils.ts`)**: A shared toolbox of math and drawing helpers available to both Server and Client.
-6. **The Analyzer (`AudioAnalysis.ts`)**: Extracts PCM data to calculate RMS volume levels for reactive visuals.
+## 🎨 Creative Examples Included
+
+- **`luma-matte`**: How to use stencil buffers for "Video inside Text" effects.
+- **`music-visualizer`**: Real-time frequency bar rendering.
+- **`meme-generator`**: A full UI example showing how to sync React/State with the Tiramisu timeline.
+- **`split-screen`**: Dynamic wipe transitions between two video sources.
+- **`snow-overlay`**: Using `seededRandomGenerator` to ensure particle systems look identical in preview and final render.
 
 ## 📝 License
-MIT
+MIT — Created by John Esleyer.

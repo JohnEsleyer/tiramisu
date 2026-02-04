@@ -184,7 +184,8 @@ const serverTextOverlayClip: DrawFunction = ({ ctx, width, height, frame, fps, u
         ctx.fillStyle = data.color;
         ctx.save();
         ctx.beginPath();
-        utils.drawRoundedRect(ctx, x, y, cardWidth, cardHeight, 20);
+        // NOTE: Changed from cardWidth to cardHeight in the drawRoundedRect call
+        utils.drawRoundedRect(ctx, x, y, cardWidth, cardHeight, 20); 
         ctx.clip();
         ctx.fillRect(x, y, 28, cardHeight);
         ctx.restore();
@@ -228,6 +229,34 @@ const serverEditorTextClip: DrawFunction = ({ ctx, width, height, localProgress,
     ctx.globalAlpha = 1;
 };
 
+// --- NEW: Meme Generator Server Clip ---
+const serverMemeClip: DrawFunction = ({ ctx, width, height, videos, data, utils }) => {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, width, height);
+    
+    // Draw background video (using fit for letterboxing)
+    if (data.videoPath && videos[data.videoPath]) {
+        utils.drawMediaFit(ctx, videos[data.videoPath], width, height);
+    }
+
+    // Draw Text (Impact style, sans-serif fallback)
+    const drawMemeText = (text: string, x: number, y: number) => {
+        // Matching the client's font logic as closely as possible
+        ctx.font = `bold 60px Impact, sans-serif`; 
+        ctx.textAlign = "center";
+        ctx.fillStyle = "white";
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 6;
+        // Use the coordinates passed via the 'data' object
+        ctx.strokeText(text.toUpperCase(), x, y);
+        ctx.fillText(text.toUpperCase(), x, y);
+    };
+
+    drawMemeText(data.topText, data.topPos.x, data.topPos.y);
+    drawMemeText(data.bottomText, data.bottomPos.x, data.bottomPos.y);
+};
+
+
 // ============================================================================
 // SERVER DEFINITION
 // ============================================================================
@@ -238,6 +267,42 @@ Bun.serve({
 
     async fetch(req) {
         const url = new URL(req.url);
+
+        // --- NEW: MEME GENERATOR EXPORT ---
+        if (url.pathname === "/api/render-meme" && req.method === "POST") {
+            try {
+                const formData = await req.formData();
+                const videoFile = formData.get("video") as File;
+                // Client sends a JSON string of state
+                const memeData = JSON.parse(formData.get("memeData") as string); 
+                
+                // Write uploaded video to a temp file
+                const videoPath = `meme_in_${Date.now()}.mp4`;
+                await Bun.write(videoPath, await videoFile.arrayBuffer());
+                const outputName = `meme_out_${Date.now()}.mp4`;
+                
+                const engine = new Tiramisu({
+                    width: 1280, height: 720, fps: 30, durationSeconds: 5,
+                    outputFile: outputName,
+                    videos: [`/${videoPath}`],
+                    data: { 
+                        videoPath: `/${videoPath}`, 
+                        ...memeData,
+                        fontSize: 60 // Hardcode size for server consistency
+                    }
+                });
+
+                // The clip uses the coordinates passed in the 'data' object
+                engine.addClip(0, 5, serverMemeClip); 
+                await engine.render();
+                
+                return new Response(Bun.file(outputName));
+            } catch (e) { 
+                console.error(e);
+                return new Response(String(e), { status: 500 }); 
+            }
+        }
+        // --- END NEW: MEME GENERATOR EXPORT ---
         
         // VISUALIZER EXPORT
         if (url.pathname === "/api/render-visualizer" && req.method === "POST") {

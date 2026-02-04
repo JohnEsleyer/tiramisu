@@ -1,61 +1,72 @@
-import { spawn } from "bun";
+import { spawn, $ } from "bun";
 
 export class TiramisuEncoder {
     private process: any;
 
-    constructor(fps: number, outputFile: string, audioFile?: string, durationSeconds?: number) { // ADD durationSeconds
+    constructor(fps: number, outputFile: string, audioFile?: string, durationSeconds?: number) {
+        this.init(fps, outputFile, audioFile, durationSeconds);
+    }
+
+    private async init(fps: number, outputFile: string, audioFile?: string, durationSeconds?: number) {
+        // 1. Detect Hardware Acceleration
+        const codec = await this.getBestCodec();
+        
         const ffmpegArgs = [
             "ffmpeg", "-y",
+            "-loglevel", "error", // Silence verbose headers/info
             "-f", "image2pipe",
             "-vcodec", "png",
             "-r", fps.toString(),
-            "-i", "-", // Input 0: The frames from Puppeteer
+            "-i", "-", 
         ];
 
-        if (audioFile) {
-            ffmpegArgs.push("-i", audioFile); // Input 1: Audio source
+        if (audioFile) ffmpegArgs.push("-i", audioFile);
+
+        // 2. Apply Hardware vs CPU settings
+        if (codec === "h264_nvenc") {
+            ffmpegArgs.push("-c:v", "h264_nvenc", "-preset", "p1", "-tune", "ll");
+        } else if (codec === "h264_videotoolbox") {
+            ffmpegArgs.push("-c:v", "h264_videotoolbox", "-realtime", "true");
+        } else {
+            ffmpegArgs.push("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23");
         }
 
-        ffmpegArgs.push(
-            "-c:v", "libx264",
-            "-pix_fmt", "yuv420p",
-            "-preset", "ultrafast", // Use ultrafast to prevent timeouts during dev
-            "-crf", "23"
-        );
+        ffmpegArgs.push("-pix_fmt", "yuv420p");
 
         if (audioFile) {
-            // Updated mapping: Use audio from input 1, video from input 0.
-            // We remove -shortest to prevent early exits if audio metadata is weird.
             ffmpegArgs.push("-map", "0:v:0", "-map", "1:a:0?", "-c:a", "aac");
         }
         
-        // --- CRITICAL FIX: Enforce the output duration
-        if (durationSeconds) {
-            ffmpegArgs.push("-t", durationSeconds.toString());
-        }
-        // --- END CRITICAL FIX ---
+        if (durationSeconds) ffmpegArgs.push("-t", durationSeconds.toString());
 
         ffmpegArgs.push(outputFile);
 
         this.process = spawn(ffmpegArgs, {
             stdin: "pipe",
-            stdout: "inherit", // Changed to inherit so you can see FFmpeg errors in your terminal
-            stderr: "inherit",
+            stdout: "ignore", 
+            stderr: "inherit", // Only show actual errors
         });
     }
 
+    private async getBestCodec(): Promise<string> {
+        try {
+            const encoders = await $`ffmpeg -encoders`.text();
+            if (encoders.includes("h264_nvenc")) return "h264_nvenc";
+            if (encoders.includes("h264_videotoolbox")) return "h264_videotoolbox";
+        } catch (e) { /* ffmpeg not found or error */ }
+        return "libx264";
+    }
+
     public async writeFrame(buffer: Uint8Array) {
-        if (this.process.stdin) {
-            // Write to the pipe and wait for the drain
+        if (this.process?.stdin) {
             this.process.stdin.write(buffer);
-            // In Bun, we don't strictly need flush() here, but it doesn't hurt.
         }
     }
 
     public async close() {
-        if (this.process.stdin) {
+        if (this.process?.stdin) {
             await this.process.stdin.end();
         }
-        await this.process.exited;
+        await this.process?.exited;
     }
 }
