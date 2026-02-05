@@ -1,6 +1,6 @@
 import puppeteer, { type Browser, type Page } from 'puppeteer';
-import { BROWSER_UTILS_CODE } from './Utils';
-import type { Clip } from './types';
+import { BROWSER_UTILS_CODE } from './Utils.js'; // Note the .js extension for ESM resolution
+import type { Clip } from './types.js';
 
 export class TiramisuBrowser {
     private browser?: Browser;
