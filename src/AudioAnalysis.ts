@@ -11,12 +11,16 @@ export class AudioAnalyzer {
         // 1. DYNAMIC IMPORT: Load WASM only when analyze is actually called
         let AudioVisualizer;
         try {
+            // When installed as a library, the WASM glue code is compiled into ./wasm relative to this file
             // @ts-ignore
-            const module = await import('./wasm/tiramisu_audio_analyzer');
+            const module = await import('./wasm/tiramisu_audio_analyzer.js');
             AudioVisualizer = module.AudioVisualizer;
         } catch (e) {
-            console.warn("   ⚠️ WASM Audio Module not found. Running in 'silent' mode.");
-            console.warn("   👉 Run 'bun run build:visualizer' to enable audio reactivity.");
+            console.warn("⚠️ WASM Audio Module failed to load.");
+            console.warn(`Error: ${e}`);
+            console.warn("Ensure you have Rust installed and 'bun install' ran successfully.");
+            
+            // Fallback: Return silent data
             const totalFrames = Math.ceil(fps * durationSeconds);
             return Array(totalFrames).fill({ rms: 0, bands: Array(32).fill(0) });
         }

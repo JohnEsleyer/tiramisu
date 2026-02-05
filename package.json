@@ -1,56 +1,42 @@
 {
   "name": "tiramisu",
-  "version": "2.1.0",
-  "main": "index.ts",
-  "module": "index.ts",
-  "types": "index.ts",
+  "version": "1.0.0",
+  "description": "Programmatic video creation engine using Canvas API and FFmpeg",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "type": "module",
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./client": {
+      "import": "./dist/src/Client.js",
+      "types": "./dist/src/Client.d.ts"
+    }
+  },
   "scripts": {
-    "BASE_EXTERNAL": "--external \"./src/Tiramisu\" --external \"./src/Server\" --external \"./src/Browser\" --external \"./src/Encoder\" --external \"./src/CLI\" --external \"./src/AudioAnalysis\" --external \"puppeteer\"",
-
-    "build": "bun build ./index.ts --target bun --outfile ./dist/tiramisu.js",
-    
-    "build:wasm": "cd src/rust_audio && cargo build --target wasm32-unknown-unknown --release && cd ../.. && wasm-bindgen src/rust_audio/target/wasm32-unknown-unknown/release/tiramisu_audio_analyzer.wasm --out-dir ./src/wasm --target nodejs",
-
-    "build:editor": "bun build ./examples/video-editor/app.ts --target browser --outfile ./examples/video-editor/editor-bundle.js $BASE_EXTERNAL",
-    "dev:editor": "bun run build:editor && bun run examples/serve.ts",
-    
-    "build:upload": "bun build ./examples/video-upload/app.ts --target browser --outfile ./examples/video-upload/bundle.js $BASE_EXTERNAL",
-    "dev:upload": "bun run build:upload && bun run examples/serve.ts",
-
-    "build:audio-overlay": "bun build ./examples/video-audio-overlay/app.ts --target browser --outfile ./examples/video-audio-overlay/bundle.js $BASE_EXTERNAL",
-    "dev:audio-overlay": "bun run build:audio-overlay && bun run examples/serve.ts",
-
-    "build:split-screen": "bun build ./examples/split-screen/app.ts --target browser --outfile ./examples/split-screen/bundle.js $BASE_EXTERNAL",
-    "dev:split-screen": "bun run build:split-screen && bun run examples/serve.ts",
-    
-    "build:mask": "bun build ./examples/luma-matte/app.ts --target browser --outfile ./examples/luma-matte/bundle.js $BASE_EXTERNAL",
-    "dev:mask": "bun run build:mask && bun run examples/serve.ts",
-    
-    "build:snow": "bun build ./examples/snow-overlay/app.ts --target browser --outfile ./examples/snow-overlay/bundle.js $BASE_EXTERNAL",
-    "dev:snow": "bun run build:snow && bun run examples/serve.ts",
-    
-    "build:visualizer": "bun run build:wasm && bun build ./examples/music-visualizer/app.ts --target browser --outfile ./examples/music-visualizer/bundle.js $BASE_EXTERNAL",
-    "dev:visualizer": "bun run build:visualizer && bun run examples/serve.ts",
-    
-    "build:meme": "bun build ./examples/meme-generator/app.ts --target browser --outfile ./examples/meme-generator/bundle.js --external \"./src/Tiramisu\" --external \"./src/Server\" --external \"./src/Browser\" --external \"./src/Encoder\" --external \"./src/CLI\" --external \"./src/AudioAnalysis\" --external \"puppeteer\"",
-    "dev:meme": "bun run build:meme && bun run examples/serve.ts",
-    
-    "start:server": "bun run examples/serve.ts"
+    "clean": "rm -rf dist src/wasm",
+    "build:wasm": "cd src/rust_audio && cargo build --target wasm32-unknown-unknown --release && cd ../.. && wasm-bindgen src/rust_audio/target/wasm32-unknown-unknown/release/tiramisu_audio_analyzer.wasm --out-dir ./dist/src/wasm --target nodejs",
+    "build:ts": "tsc",
+    "build": "bun run clean && bun run build:wasm && bun run build:ts",
+    "prepare": "bun run build"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
   },
   "dependencies": {
     "puppeteer": "^24.36.1"
   },
   "devDependencies": {
     "@types/bun": "^1.3.8",
-    "@types/node": "^25.2.0"
-  },
-  "exports": {
-    ".": {
-      "import": "./index.ts"
-    },
-    "./client": {
-      "import": "./src/Client.ts"
-    }
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
   }
 }
