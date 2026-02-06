@@ -1,30 +1,12 @@
-```markdown
 # Utilities and Math
 
-Tiramisu injects a `utils` object into every frame to solve common video-creation problems.
+Tiramisu injects a `utils` object into every frame.
 
 ## Deterministic Randomness
-**Critical:** Never use `Math.random()` in a video engine. If you do, your animation will flicker because every time a frame is re-rendered, it will get a different value.
+**Important:** Do not use `Math.random()`. If you do, your video will flicker (e.g., particles jumping to new positions every time a frame is re-rendered).
 
-Use `utils.seededRandomGenerator(seed)`:
+Use `utils.seededRandomGenerator(seed)` (Mulberry32 implementation):
 ```typescript
 const rng = utils.seededRandomGenerator(12345);
-const x = rng() * width; // This will ALWAYS be the same for this specific clip/frame.
-```
-
-## Easings
-Standard easing functions are built-in:
-- `utils.easeOutCubic(t)`
-- `utils.easeInQuad(t)`
-- `utils.easeOutBounce(t)`
-
-## Stencil Masking
-The `utils.drawMasked` helper allows you to draw content (like a video) into a specific shape (like text).
-
-```typescript
-utils.drawMasked(
-    ctx,
-    (c) => c.drawImage(myVideo, 0, 0), // Content
-    (c) => c.fillText("HELLO", 100, 100) // Mask
-);
+const x = rng() * width; // Always yields the same result for this seed.
 ```
