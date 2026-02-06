@@ -20,6 +20,13 @@ export interface RenderConfig<T = any> {
     canvas?: HTMLCanvasElement | string;
 }
 
+export type ProgressPayload = {
+    frame: number;
+    total: number;
+    percent: number;
+    eta: number; // Estimated seconds remaining
+};
+
 export interface RenderContext<T = any> {
     frame: number;
     progress: number;
