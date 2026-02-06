@@ -1,32 +1,33 @@
 {
     "name": "tiramisu",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Programmatic video creation engine using Canvas API and FFmpeg",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./index.ts",
+    "types": "./index.ts",
     "exports": {
         ".": {
-            "import": "./dist/index.js",
-            "types": "./dist/index.d.ts"
+            "import": "./index.ts",
+            "types": "./index.ts"
         },
         "./client": {
-            "import": "./dist/src/Client.js",
-            "types": "./dist/src/Client.d.ts"
+            "import": "./src/Client.ts",
+            "types": "./src/Client.ts"
         },
         "./types": {
-            "import": "./dist/src/types.js",
-            "types": "./dist/src/types.d.ts"
+            "import": "./src/types.ts",
+            "types": "./src/types.ts"
         }
     },
     "files": [
-        "dist"
+        "src",
+        "index.ts",
+        "README.md"
     ],
     "scripts": {
         "clean": "rm -rf dist",
-        "build:wasm": "cd src/rust_audio && cargo build --target wasm32-unknown-unknown --release && cd ../.. && wasm-bindgen src/rust_audio/target/wasm32-unknown-unknown/release/tiramisu_audio_analyzer.wasm --out-dir ./dist/src/wasm --target nodejs",
-        "build:ts": "tsc",
-        "build": "bun run clean && bun run build:wasm && bun run build:ts"
+        "build:wasm": "cd src/rust_audio && cargo build --target wasm32-unknown-unknown --release && cd ../.. && wasm-bindgen src/rust_audio/target/wasm32-unknown-unknown/release/tiramisu_audio_analyzer.wasm --out-dir ./src/wasm --target nodejs",
+        "build": "bun run build:wasm"
     },
     "peerDependencies": {
         "typescript": "^5.0.0"

@@ -1,3 +1,4 @@
+/* FILE: .gitignore */
 node_modules
 dist
 target
@@ -7,3 +8,6 @@ target
 *.log
 .tiramisu-cache
 codebase.txt
+
+# Important: Allow the generated WASM to be committed
+!src/wasm/

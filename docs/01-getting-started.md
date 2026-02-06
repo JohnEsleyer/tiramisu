@@ -5,7 +5,6 @@ Tiramisu is a programmatic video engine that uses a **Unified Canvas API**. Writ
 ## Prerequisites
 - [Bun](https://bun.sh) (Runtime)
 - **FFmpeg** (Must be in your system PATH)
-- **Rust/Cargo** (Required to build the audio analysis module)
 
 ## Installation
 
@@ -13,12 +12,7 @@ Tiramisu is a programmatic video engine that uses a **Unified Canvas API**. Writ
    ```bash
    bun install
    ```
-
-2. **Build the Audio Analyzer**:
-   Tiramisu uses a Rust-powered WASM module to ensure that audio frequency data (FFT) in the final render matches the browser preview exactly.
-   ```bash
-   bun run build:wasm
-   ```
+   *Note: Tiramisu comes with a pre-compiled Audio Analyzer WASM module, so you do not need Rust or Cargo installed unless you plan to modify the analyzer's core logic.*
 
 ## Your First Render
 On the server, Tiramisu uses Puppeteer to "photograph" your canvas and pipe the buffers directly into FFmpeg via STDIN.
