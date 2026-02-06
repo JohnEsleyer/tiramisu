@@ -7,16 +7,16 @@
     "types": "./index.ts",
     "exports": {
         ".": {
-            "import": "./index.ts",
-            "types": "./index.ts"
+            "types": "./index.ts",
+            "import": "./index.ts"
         },
         "./client": {
-            "import": "./src/Client.ts",
-            "types": "./src/Client.ts"
+            "types": "./src/Client.ts",
+            "import": "./src/Client.ts"
         },
         "./types": {
-            "import": "./src/types.ts",
-            "types": "./src/types.ts"
+            "types": "./src/types.ts",
+            "import": "./src/types.ts"
         }
     },
     "files": [
