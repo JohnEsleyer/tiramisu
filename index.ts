@@ -1,7 +1,7 @@
-import { Tiramisu } from "./src/Tiramisu";
-export * from "./src/types";
-export { BROWSER_UTILS_CODE, TiramisuUtils } from "./src/Utils";
-export { TiramisuPlayer } from "./src/Client";
+import { Tiramisu } from "./src/Tiramisu.js";
+export * from "./src/types.js";
+export { BROWSER_UTILS_CODE, TiramisuUtils } from "./src/Utils.js";
+export { TiramisuPlayer } from "./src/Client.js";
 
 // Server-side Engine
 export { Tiramisu };

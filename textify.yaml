@@ -24,3 +24,5 @@ dirs:
             - md
             - lock
             - ts
+            - rs
+            - toml

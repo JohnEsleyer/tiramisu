@@ -1,42 +1,42 @@
 {
-  "name": "tiramisu",
-  "version": "1.0.0",
-  "description": "Programmatic video creation engine using Canvas API and FFmpeg",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "type": "module",
-  "files": [
-    "dist",
-    "src",
-    "README.md"
-  ],
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+    "name": "tiramisu",
+    "version": "1.0.0",
+    "description": "Programmatic video creation engine using Canvas API and FFmpeg",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        },
+        "./client": {
+            "import": "./dist/src/Client.js",
+            "types": "./dist/src/Client.d.ts"
+        },
+        "./types": {
+            "import": "./dist/src/types.js",
+            "types": "./dist/src/types.d.ts"
+        }
     },
-    "./client": {
-      "import": "./dist/src/Client.js",
-      "types": "./dist/src/Client.d.ts"
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "clean": "rm -rf dist",
+        "build:wasm": "cd src/rust_audio && cargo build --target wasm32-unknown-unknown --release && cd ../.. && wasm-bindgen src/rust_audio/target/wasm32-unknown-unknown/release/tiramisu_audio_analyzer.wasm --out-dir ./dist/src/wasm --target nodejs",
+        "build:ts": "tsc",
+        "build": "bun run clean && bun run build:wasm && bun run build:ts"
+    },
+    "peerDependencies": {
+        "typescript": "^5.0.0"
+    },
+    "dependencies": {
+        "puppeteer": "^24.36.1"
+    },
+    "devDependencies": {
+        "@types/bun": "^1.3.8",
+        "@types/node": "^22.0.0",
+        "typescript": "^5.7.0"
     }
-  },
-  "scripts": {
-    "clean": "rm -rf dist src/wasm",
-    "build:wasm": "cd src/rust_audio && cargo build --target wasm32-unknown-unknown --release && cd ../.. && wasm-bindgen src/rust_audio/target/wasm32-unknown-unknown/release/tiramisu_audio_analyzer.wasm --out-dir ./dist/src/wasm --target nodejs",
-    "build:ts": "tsc",
-    "build": "bun run clean && bun run build:wasm && bun run build:ts",
-    "prepare": "bun run build"
-  },
-  "peerDependencies": {
-    "typescript": "^5.0.0"
-  },
-  "dependencies": {
-    "puppeteer": "^24.36.1"
-  },
-  "devDependencies": {
-    "@types/bun": "^1.3.8",
-    "@types/node": "^22.0.0",
-    "typescript": "^5.7.0"
-  }
 }
