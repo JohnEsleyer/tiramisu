@@ -41,7 +41,7 @@ export interface RenderContext<T = any> {
     fps: number;
     data: T;
     assets: Record<string, HTMLImageElement>;
-    videos: Record<string, HTMLVideoElement>;
+    videos: Record<string, any>; // VideoController or HTMLVideoElement for compatibility
     utils: typeof import("./Utils.js").TiramisuUtils;
 }
 
