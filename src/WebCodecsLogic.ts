@@ -11,6 +11,7 @@ class VideoDecoderController {
         this.decoder = null;
         this.samples = [];
         this.info = null;
+        this.mp4boxfile = null;
         this.frameCache = new Map();
         this.isReady = false;
         this.lastDecodedFrame = -1;
@@ -22,10 +23,11 @@ class VideoDecoderController {
         
         return new Promise((resolve) => {
             const mp4boxfile = MP4Box.createFile();
+            this.mp4boxfile = mp4boxfile;
             
             mp4boxfile.onReady = (info) => {
                 this.info = info.videoTracks[0];
-                mp4boxfile.setExtractionConfig(this.info.id, null, { nb_samples: 10000 });
+                mp4boxfile.setExtractionOptions(this.info.id, null, { nbSamples: 10000 });
                 mp4boxfile.start();
             };
 
@@ -65,9 +67,12 @@ class VideoDecoderController {
             const config = {
                 codec: this.info.codec,
                 codedWidth: this.info.track_width,
-                codedHeight: this.info.track_height,
-                description: this.getExtradata()
+                codedHeight: this.info.track_height
             };
+            const extra = this.getExtradata();
+            if (extra) {
+                config.description = extra;
+            }
 
             decoder.configure(config);
 
@@ -92,10 +97,17 @@ class VideoDecoderController {
 
     getExtradata() {
         // Extracts the avcC/hvcC box for the decoder configuration
-        const entry = this.info.stsd.entries[0];
-        const box = entry.avcC || entry.hvcC || entry.vpcC;
+        let entry = this.info?.stsd?.entries?.[0];
+
+        if (!entry && this.mp4boxfile && this.info?.id) {
+            const trak = this.mp4boxfile.getTrackById(this.info.id);
+            entry = trak?.mdia?.minf?.stbl?.stsd?.entries?.[0];
+        }
+
+        const box = entry?.avcC || entry?.hvcC || entry?.vpcC;
         if (!box) return null;
-        const stream = new DataStream(undefined, 0, DataStream.BIG_ENDIAN);
+        const MP4DataStream = (window.MP4Box && window.MP4Box.DataStream) || DataStream;
+        const stream = new MP4DataStream(undefined, 0, MP4DataStream.BIG_ENDIAN);
         box.write(stream);
         return new Uint8Array(stream.buffer, 8); // Skip size and type
     }

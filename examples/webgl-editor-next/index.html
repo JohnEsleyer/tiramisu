@@ -126,6 +126,13 @@
       box-shadow: var(--shadow);
     }
 
+    .export {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 160px;
+    }
+
     .transport button {
       border: none;
       background: var(--accent-1);
@@ -318,6 +325,74 @@
       font-family: 'IBM Plex Mono', ui-monospace, monospace;
     }
 
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(5, 7, 12, 0.7);
+      backdrop-filter: blur(6px);
+      z-index: 50;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-card {
+      width: min(420px, 90vw);
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 18px;
+      padding: 20px 22px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+      display: grid;
+      gap: 14px;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .modal-body {
+      font-size: 13px;
+      color: var(--ink-1);
+      line-height: 1.5;
+    }
+
+    .progress-bar {
+      position: relative;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      position: absolute;
+      inset: 0;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-1), var(--accent-0));
+      transition: width 0.2s ease;
+    }
+
+    .progress-bar::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      width: 35%;
+      background: linear-gradient(90deg, transparent, var(--accent-1), transparent);
+      animation: progress-slide 1.2s ease-in-out infinite;
+    }
+
+    @keyframes progress-slide {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(300%); }
+    }
+
     @media (max-width: 1100px) {
       body {
         grid-template-columns: 1fr;
@@ -350,6 +425,10 @@
       <button id="stop" class="secondary">Stop</button>
       <input id="scrub" type="range" min="0" max="10" step="0.01" value="0" />
       <div class="timecode" id="timecode">0:00 / 0:00</div>
+      <div class="export">
+        <button id="export" class="secondary">Export MP4</button>
+        <div class="status" id="export-status">Server export idle</div>
+      </div>
     </div>
 
     <div class="timeline">
@@ -483,6 +562,16 @@
       </div>
     </div>
   </aside>
+
+  <div class="modal" id="export-modal" role="dialog" aria-live="polite" aria-busy="true">
+    <div class="modal-card">
+      <div class="modal-title" id="export-modal-title">Rendering on server</div>
+      <div class="modal-body" id="export-modal-body">Preparing render job...</div>
+      <div class="progress-bar" aria-hidden="true">
+        <div class="progress-fill" id="export-progress-fill"></div>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="app.js?v=2"></script>
 </body>

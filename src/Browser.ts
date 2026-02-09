@@ -1,8 +1,6 @@
 import puppeteer, { type Browser, type Page } from "puppeteer";
 import { BROWSER_UTILS_CODE } from "./Utils.js";
 import { WEBCODECS_LOGIC } from "./WebCodecsLogic.js";
-import { readFileSync } from "fs";
-import { join } from "path";
 import type { Clip } from "./types.js";
 
 export class TiramisuBrowser {
@@ -37,13 +35,26 @@ export class TiramisuBrowser {
     ) {
         if (!this.page) return;
         await this.page.goto(url);
+
+        // Define __name helper for esbuild-injected function naming
+        await this.page.evaluate(() => {
+            (window as any).__name = (fn: any) => fn;
+        });
         
-        // Inject MP4Box and our logic
-        const mp4boxPath = join(process.cwd(), "node_modules", "mp4box", "dist", "mp4box.all.js");
-        const MP4BOX_SOURCE = readFileSync(mp4boxPath, "utf-8");
-        await this.page.evaluate(MP4BOX_SOURCE);
+        const hasVideos = Array.isArray(videoKeys) && videoKeys.length > 0;
+        const useVideoElement = !!data?.useVideoElement;
+
+        // Inject utilities
         await this.page.evaluate(BROWSER_UTILS_CODE);
-        await this.page.evaluate(WEBCODECS_LOGIC);
+
+        // Inject MP4Box + WebCodecs only when videos are present and enabled
+        if (hasVideos && !useVideoElement) {
+            await this.page.evaluate(async () => {
+                const mod = await import("/node_modules/mp4box/dist/mp4box.all.js");
+                (window as any).MP4Box = mod;
+            });
+            await this.page.evaluate(WEBCODECS_LOGIC);
+        }
 
         await this.page.evaluate(
             async (
@@ -79,9 +90,11 @@ export class TiramisuBrowser {
 
                 win.loadedVideos = {};
                 
-                // Initialize decoders for all videos in memory
-                for (const videoUrl of videoKeyList) {
-                    await (window as any).initVideo(videoUrl);
+                if (!injectedData?.useVideoElement && videoKeyList.length > 0 && (window as any).initVideo) {
+                    // Initialize decoders for all videos in memory
+                    for (const videoUrl of videoKeyList) {
+                        await (window as any).initVideo(videoUrl);
+                    }
                 }
                 
                 // Type assertion for videoFrames
@@ -96,6 +109,8 @@ export class TiramisuBrowser {
 
                 win.audioData = levels; // store the analyzed RMS data from server
 
+                win.videoElements = new Map();
+
                 win.renderFrame = async (
                     frame: number,
                     fps: number,
@@ -106,12 +121,44 @@ export class TiramisuBrowser {
                 ) => {
                     const ctx = canvas.getContext("2d")!;
 
-                    // Fetch frames from WebCodecs Decoders instead of <img> tags
                     const videoFrames: Record<string, any> = {};
-                    for (const [key, path] of Object.entries(vMap)) {
-                        const controller = (window as any).VideoDecoders.get(key);
-                        if (controller) {
-                            videoFrames[key] = await controller.getFrame(frame, fps);
+                    const useVideoElement = !!injectedData?.useVideoElement;
+
+                    if (useVideoElement) {
+                        const time = frame / fps;
+                        for (const [key, path] of Object.entries(vMap)) {
+                            let video = win.videoElements.get(key);
+                            if (!video) {
+                                video = document.createElement("video");
+                                video.muted = true;
+                                video.playsInline = true;
+                                video.preload = "auto";
+                                video.crossOrigin = "anonymous";
+                                video.src = path;
+                                win.videoElements.set(key, video);
+                                await new Promise((resolve) => {
+                                    video.addEventListener("loadeddata", resolve, { once: true });
+                                });
+                            }
+
+                            if (Number.isFinite(time)) {
+                                if (Math.abs(video.currentTime - time) > 0.02) {
+                                    await new Promise((resolve) => {
+                                        const onSeeked = () => resolve(undefined);
+                                        video.addEventListener("seeked", onSeeked, { once: true });
+                                        video.currentTime = Math.max(0, time);
+                                    });
+                                }
+                                videoFrames[key] = video;
+                            }
+                        }
+                    } else {
+                        // Fetch frames from WebCodecs Decoders instead of <img> tags
+                        for (const [key] of Object.entries(vMap)) {
+                            const controller = (window as any).VideoDecoders.get(key);
+                            if (controller) {
+                                videoFrames[key] = await controller.getFrame(frame, fps);
+                            }
                         }
                     }
 

@@ -7,6 +7,7 @@ const state = {
   vao: null,
   textures: [],
   videos: [null, null],
+  files: [null, null],
   clips: [null, null],
   playing: false,
   startTime: 0,
@@ -15,7 +16,8 @@ const state = {
   lastFrameTime: 0,
   fpsSamples: [],
   canvas: null,
-  uniform: {}
+  uniform: {},
+  initError: null
 };
 
 const ui = {};
@@ -121,6 +123,12 @@ function initUI() {
   ui.timecode = $('timecode');
   ui.fps = $('fps');
   ui.engine = $('engine-state');
+  ui.export = $('export');
+  ui.exportStatus = $('export-status');
+  ui.exportModal = $('export-modal');
+  ui.exportModalTitle = $('export-modal-title');
+  ui.exportModalBody = $('export-modal-body');
+  ui.exportProgress = $('export-progress-fill');
   ui.statusA = $('status-a');
   ui.statusB = $('status-b');
   ui.sampleA = $('sample-a');
@@ -337,6 +345,7 @@ function bindControls() {
   ui.play.addEventListener('click', () => play());
   ui.pause.addEventListener('click', () => pause());
   ui.stop.addEventListener('click', () => stop());
+  ui.export.addEventListener('click', () => exportServerRender());
   ui.scrub.addEventListener('input', (e) => {
     setPlayhead(parseFloat(e.target.value));
     if (state.playing) {
@@ -356,6 +365,192 @@ function bindControls() {
 
   bindClipInputs('a', 0);
   bindClipInputs('b', 1);
+}
+
+function setExportModal(active, title, body) {
+  if (!ui.exportModal) return;
+  ui.exportModal.classList.toggle('active', active);
+  if (title && ui.exportModalTitle) ui.exportModalTitle.textContent = title;
+  if (body && ui.exportModalBody) ui.exportModalBody.textContent = body;
+  if (!active && ui.exportProgress) ui.exportProgress.style.width = '0%';
+}
+
+async function exportServerRender() {
+  if (!ui.export) return;
+  ui.export.disabled = true;
+  const originalText = ui.export.textContent;
+  ui.export.textContent = 'Rendering...';
+  if (ui.exportStatus) ui.exportStatus.textContent = 'Sending job to server';
+  setExportModal(true, 'Rendering on server', 'Sending render job...');
+  let failed = false;
+
+  const payload = await buildExportPayload();
+
+  try {
+    const response = await fetch('/api/export-canvas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server failed to render (HTTP ${response.status})`);
+    }
+
+    const { jobId } = await response.json();
+    if (!jobId) {
+      throw new Error('No job id returned from server');
+    }
+
+    await pollExportJob(jobId);
+
+    if (ui.exportStatus) ui.exportStatus.textContent = 'Download started';
+    setExportModal(true, 'Render complete', 'Download started.');
+  } catch (error) {
+    console.error(error);
+    if (ui.exportStatus) ui.exportStatus.textContent = 'Export failed (check server)';
+    failed = true;
+    const message = error instanceof Error ? error.message : String(error);
+    setExportModal(
+      true,
+      'Export failed',
+      `Server did not accept the job. Ensure /api/export-canvas is implemented. ${message}`
+    );
+  } finally {
+    ui.export.disabled = false;
+    ui.export.textContent = originalText;
+    setTimeout(() => setExportModal(false), failed ? 3500 : 1200);
+  }
+}
+
+async function buildExportPayload() {
+  const clips = state.clips.map((clip) => clip ? ({
+    start: clip.start,
+    duration: clip.duration,
+    opacity: clip.opacity,
+    scale: clip.scale,
+    x: clip.x,
+    y: clip.y,
+    rot: clip.rot,
+    brightness: clip.brightness,
+    contrast: clip.contrast,
+    saturation: clip.saturation
+  }) : null);
+
+  const sources = [];
+  for (let i = 0; i < state.videos.length; i++) {
+    const video = state.videos[i];
+    const file = state.files[i];
+    if (file) {
+      const data = await fileToBase64(file);
+      sources.push({ kind: 'file', name: file.name, data });
+    } else if (video && video.src && !video.src.startsWith('blob:')) {
+      sources.push({ kind: 'url', url: video.src });
+    } else {
+      sources.push(null);
+    }
+  }
+
+  return {
+    resolution: '1280x720',
+    fps: 30,
+    duration: Number(state.duration) || 10,
+    clips,
+    sources
+  };
+}
+
+async function pollExportJob(jobId) {
+  const start = Date.now();
+  const timeoutMs = 5 * 60 * 1000;
+
+  while (Date.now() - start < timeoutMs) {
+    const response = await fetch(`/api/export-canvas/status?id=${encodeURIComponent(jobId)}`);
+    if (!response.ok) {
+      throw new Error(`Status check failed (HTTP ${response.status})`);
+    }
+
+    const status = await response.json();
+    if (status.status === 'failed') {
+      throw new Error(status.error || 'Server render failed');
+    }
+
+    if (status.status === 'done' && status.downloadUrl) {
+      setExportModal(true, 'Rendering on server', 'Encoding complete. Downloading...');
+      const download = await fetch(status.downloadUrl);
+      if (!download.ok) {
+        throw new Error(`Download failed (HTTP ${download.status})`);
+      }
+      const blob = await download.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = 'tiramisu-webgl-next.mp4';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+      return;
+    }
+
+    const percent = Math.max(0, Math.min(100, Math.round(status.percent || 0)));
+    setExportModal(true, 'Rendering on server', `Progress: ${percent}%`);
+    if (ui.exportStatus) ui.exportStatus.textContent = `Rendering ${percent}%`;
+    if (ui.exportProgress) ui.exportProgress.style.width = `${percent}%`;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+
+  throw new Error('Render timed out');
+}
+
+async function fileToBase64(file) {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+async function setExportState(payload) {
+  if (!payload) return;
+  if (Array.isArray(payload.clips)) {
+    payload.clips.forEach((clip, index) => {
+      if (!clip || !state.clips[index]) return;
+      Object.assign(state.clips[index], clip);
+    });
+  }
+
+  if (Array.isArray(payload.sources)) {
+    for (let i = 0; i < payload.sources.length; i++) {
+      const source = payload.sources[i];
+      if (!source) continue;
+      if (source.url) {
+        await loadVideo(i, source.url, `Source ${i + 1}`);
+      }
+    }
+  }
+
+  if (payload.duration) {
+    state.duration = Number(payload.duration) || state.duration;
+    ui.scrub.max = state.duration.toFixed(2);
+  }
+
+  updateTimeline();
+  updateTimecode();
+  render();
+}
+
+function renderAt(time) {
+  const clamped = Math.max(0, Math.min(time, state.duration));
+  state.playhead = clamped;
+  updateTimeline();
+  updateTimecode();
+  syncPlayhead();
+  render();
 }
 
 function bindClipInputs(prefix, index) {
@@ -392,6 +587,7 @@ function bindClipInputs(prefix, index) {
 function handleFile(event, index) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
+  state.files[index] = file;
   const url = URL.createObjectURL(file);
   loadVideo(index, url, file.name)
     .then(() => syncPlayhead())
@@ -580,12 +776,25 @@ function formatTime(seconds) {
 
 function start() {
   initUI();
-  initGL();
+  try {
+    initGL();
+  } catch (error) {
+    state.initError = error instanceof Error ? error.message : String(error);
+    if (ui.engine) ui.engine.textContent = 'error';
+    console.error(error);
+  }
   initClips();
   bindControls();
   updateTimecode();
-  ui.engine.textContent = 'idle';
-  render();
+  if (ui.engine && !state.initError) ui.engine.textContent = 'idle';
+  if (!state.initError) render();
+
+  window.__webglNext = {
+    setExportState,
+    renderAt,
+    isReady: () => !!state.gl,
+    getError: () => state.initError
+  };
 }
 
 start();
