@@ -12,7 +12,14 @@ export class TiramisuBrowser {
     public async init(width: number, height: number, headless: boolean) {
         this.browser = await puppeteer.launch({
             headless: headless ? "shell" : false,
-            args: ["--no-sandbox", "--disable-setuid-sandbox"],
+            args: [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--enable-gpu",
+                "--use-gl=angle",
+                "--ignore-gpu-blocklist",
+                "--disable-software-rasterizer"
+            ],
         });
         this.page = await this.browser.newPage();
         await this.page.setViewport({ width, height, deviceScaleFactor: 1 });

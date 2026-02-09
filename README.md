@@ -1,36 +1,73 @@
 
-# 🍰 Tiramisu
+# 🍰 Tiramisu 2.0 - WebGL-Powered Video Editor Library
 
-**Tiramisu** is a high-performance, programmatic video creation engine built on [Bun](https://bun.sh). It bridges the gap between the browser and the server, allowing you to build complex video compositions using the familiar HTML5 Canvas API and render them into high-quality MP4s.
+🍰 **Phase 1 Complete: WebGL Core & WebCodecs Integration**
 
-Unlike traditional video frameworks, Tiramisu features a **zero-disk-waste pipeline**: Puppeteer screenshots are streamed directly into FFmpeg via STDIN, while a lightweight client-side player provides real-time previews for rapid development.
+Tiramisu has been completely rebuilt from a Canvas 2D engine to a WebGL-powered video editing library with WebCodecs integration for high-performance video processing.
 
 ## 🔗 Repository
 [github.com/JohnEsleyer/tiramisu](https://github.com/JohnEsleyer/tiramisu)
 
-## ✨ Key Features
+## 🚀 What's New in 2.0
 
-- **Unified API**: Write your drawing logic once; run it in the browser for live previews and on the server for final rendering.
-- **Audio Reactivity (WASM)**: High-fidelity audio analysis providing real-time RMS volume and frequency bands (FFT) via a Rust-powered WASM module.
-- **Dynamic Asset Pipeline**: Automatic preloading for Images, Fonts (Google/Local), and Videos (synchronized frame-by-frame).
-- **Interactive Preview Player**: Built-in `TiramisuPlayer` for the browser with support for scrubbing, play/pause, and real-time state updates.
-- **Animation Toolbox**: 
-    - **Easings**: Bounce, Cubic, Expo, etc.
-    - **Masking**: Advanced Luma/Stencil masking (video-in-text, shapes).
-    - **Deterministic RNG**: Seeded random generators for consistent particle systems (e.g., snow, rain).
-    - **Layout**: `drawMediaFit` and `drawMediaCover` helpers for responsive media.
+### WebGL Rendering Core
+- **WebGL2 Texture Pipeline**: Replace CPU-based Canvas 2D with GPU-accelerated rendering
+- **Ping-Pong Rendering**: Multi-pass effects with framebuffers for complex shader chains
+- **High-Performance**: Native video frame uploads to GPU textures via `WebCodecs API`
 
-## 🛠 Prerequisites
+### WebCodecs Integration
+- **VideoDecoder API**: Hardware-accelerated video decoding
+- **GOP Manager**: Instant seeking with keyframe-based navigation
+- **Memory Efficient**: Automatic `VideoFrame` cleanup and texture pooling
 
-- **Bun**: The runtime.
-- **FFmpeg**: Required for encoding the final video.
-- **Rust (Optional)**: Only required if you wish to modify/rebuild the audio analyzer WASM.
+### Real-time Effects
+- **Fragment Shaders**: GPU-accelerated effects (grayscale, blur, brightness, tint, chromakey)
+- **Effect Chains**: Stack multiple effects with zero CPU overhead
+- **Custom Shaders**: Upload your own GLSL shaders for unique effects
+
+## 🏗️ Architecture
+
+```
+Old Way (Tiramisu 1.x):
+Video Element → Canvas 2D → CPU → Screen
+
+New Way (Tiramisu 2.x):
+MP4 → MP4Box.js → VideoDecoder → VideoFrame → GPU Texture → Fragment Shader → Screen
+```
+
+## 📦 Installation
 
 ```bash
-# macOS
-brew install ffmpeg
-# Linux
-sudo apt install ffmpeg
+npm install tiramisu
+```
+
+## 🎯 Quick Start - Hello Video
+
+```typescript
+import { TiramisuWebGLPlayer } from 'tiramisu/webgl';
+
+// Create WebGL player
+const player = new TiramisuWebGLPlayer({
+    canvas: 'myCanvas',
+    width: 1920,
+    height: 1080,
+    fps: 30,
+    durationSeconds: 10,
+    videos: ['path/to/video.mp4'],
+    webgl: true,
+    webcodecs: true
+});
+
+// Load video
+await player.load();
+
+// Add effects
+player.addEffect(
+    player.getShaderManager().createGrayscaleEffect(0.8)
+);
+
+// Play video
+player.play();
 ```
 
 ## 📦 Installation
@@ -39,39 +76,91 @@ sudo apt install ffmpeg
    ```bash
    git clone https://github.com/JohnEsleyer/tiramisu.git
    cd tiramisu
-   bun install
+   pnpm install
    ```
 
 2. **Build the Audio Analyzer (Required for Visualizers):**
    ```bash
-   bun run build:wasm
+   pnpm run build:wasm
    ```
 
 3. **Try an Example:**
    ```bash
-   bun run dev:visualizer  # Music Visualizer
-   bun run dev:meme        # Meme Generator with Drag & Drop
-   bun run dev:snow        # Deterministic Snow Overlay
+   pnpm run dev:visualizer  # Music Visualizer
+   pnpm run dev:meme        # Meme Generator with Drag & Drop
+   pnpm run dev:snow        # Deterministic Snow Overlay
    ```
 
-## 🎬 Quick Start
+## 🔧 API Reference
 
-### 1. Unified Drawing Logic
-The core of Tiramisu is the `DrawFunction`. It receives a `context` containing the Canvas 2D API, timing info, and audio data.
+### WebGL Core Classes
+
+#### `TiramisuRenderer`
+Main WebGL rendering engine with ping-pong framebuffers and texture management.
 
 ```typescript
-const myClip = ({ ctx, width, height, localProgress, audioVolume, utils }) => {
-    // Fill background
-    ctx.fillStyle = "#0f172a";
-    ctx.fillRect(0, 0, width, height);
-    
-    // Animate a circle based on audio volume
-    const radius = 50 + (audioVolume * 100);
-    ctx.beginPath();
-    ctx.arc(width/2, height/2, radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#38bdf8";
-    ctx.fill();
-};
+const renderer = new TiramisuRenderer(canvas, config);
+renderer.renderToCanvas(texture, effects);
+```
+
+#### `TextureManager` 
+Efficient GPU texture pool and video frame uploads.
+
+```typescript
+const textureManager = new TextureManager(gl);
+const texture = textureManager.uploadVideoFrame(videoFrame);
+```
+
+#### `WebCodecsVideoSource`
+Hardware-accelerated video decoding with seeking support.
+
+```typescript
+const videoSource = new WebCodecsVideoSource(videoUrl, config);
+await videoSource.initialize();
+await videoSource.seekToFrame(frameNumber);
+```
+
+#### `ShaderManager`
+Pre-built effects and custom shader loading.
+
+```typescript
+const shaderManager = new ShaderManager(renderer);
+const blurEffect = shaderManager.createBlurEffect(radius, resolution);
+player.addEffect(blurEffect);
+```
+
+### Built-in Effects
+
+- **Grayscale**: Luminance-based black & white conversion
+- **Blur**: Gaussian blur with directional options
+- **Brightness/Contrast**: Exposure and contrast adjustments  
+- **Tint**: Color overlay with configurable strength
+- **Chroma Key**: Green screen removal with spill reduction
+
+## 🎬 Browser Support
+
+### Required APIs
+- **WebGL2**: For shader-based rendering
+- **WebCodecs**: For hardware video decoding
+- **MP4Box.js**: For MP4 demuxing
+
+### Browser Compatibility
+- Chrome 94+ ✅
+- Edge 94+ ✅ 
+- Safari 17+ (partial) ⚠️
+- Firefox 100+ (experimental) ⚠️
+
+## 🔨 Development
+
+```bash
+# Build the library
+npm run build
+
+# Run demo
+npm run demo
+
+# Type checking
+npm run typecheck
 ```
 
 ### 2. Live Preview (Client-Side)
@@ -103,21 +192,40 @@ engine.addClip(0, 5, myClip);
 await engine.render();
 ```
 
-## 🧠 Architecture
+## 🎯 Phase 1 Goal Achieved
 
-1.  **The Server (`Tiramisu.ts`)**: Orchestrates the headless browser (Puppeteer) and the encoder (FFmpeg).
-2.  **The Analyzer (`AudioAnalysis.ts`)**: Uses a **Rust/WASM** module to perform FFT and RMS analysis on audio files, mirroring Web Audio API behavior on the server.
-3.  **The Video Manager (`VideoManager.ts`)**: Extracts video frames into a local cache to ensure frame-accurate synchronization during headless rendering.
-4.  **The Utils (`Utils.ts`)**: A shared library injected into both Puppeteer and the Browser Player to ensure math and drawing functions are identical across environments.
-5.  **The Encoder (`Encoder.ts`)**: Automatically detects hardware acceleration (NVENC, VideoToolbox) for faster-than-realtime encoding.
+✅ **"Hello Video" WebGL Previewer**
+- Load 4K MP4 via WebCodecs  
+- Seek to any frame with slider
+- Display in WebGL canvas
+- Apply real-time effects with zero CPU lag
 
-## 🎨 Creative Examples Included
+## 🗺️ Roadmap
 
-- **`luma-matte`**: How to use stencil buffers for "Video inside Text" effects.
-- **`music-visualizer`**: Real-time frequency bar rendering.
-- **`meme-generator`**: A full UI example showing how to sync React/State with the Tiramisu timeline.
-- **`split-screen`**: Dynamic wipe transitions between two video sources.
-- **`snow-overlay`**: Using `seededRandomGenerator` to ensure particle systems look identical in preview and final render.
+### Phase 2: Advanced Features
+- Multi-track timeline
+- Transition effects
+- Audio waveform visualization
+- Export functionality
 
-## 📝 License
-MIT — Created by John Esleyer.
+### Phase 3: Production Ready
+- Performance optimization
+- Error handling
+- Documentation
+- Test suite
+
+## 📄 License
+
+MIT License - see LICENSE file for details
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+**Tiramisu 2.0** - Where video editing meets WebGL performance 🚀

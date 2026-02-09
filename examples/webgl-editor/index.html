@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiramisu WebGL Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            overflow: hidden;
+            display: flex;
+            height: 100vh;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .canvas-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            position: relative;
+        }
+
+        #gl-canvas {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            border: 2px solid #333;
+        }
+
+        .playback-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 20px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .sidebar {
+            width: 320px;
+            background: #252525;
+            padding: 20px;
+            overflow-y: auto;
+            border-left: 1px solid #333;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+        }
+
+        .control-group h3 {
+            margin-bottom: 12px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+        }
+
+        .slider-control {
+            margin-bottom: 15px;
+        }
+
+        .slider-control label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #ccc;
+        }
+
+        .slider-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #007acc;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .slider-value {
+            min-width: 45px;
+            text-align: right;
+            font-size: 12px;
+            color: #007acc;
+        }
+
+        select {
+            width: 100%;
+            padding: 8px;
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #005a9e;
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        .seek-bar {
+            width: 300px;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .seek-bar::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #007acc;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .time-display {
+            font-size: 12px;
+            color: #ccc;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .video-input {
+            margin-bottom: 15px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-label {
+            display: block;
+            padding: 8px 16px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: center;
+            transition: background 0.2s;
+        }
+
+        .file-label:hover {
+            background: #444;
+        }
+
+        .status {
+            margin-top: 10px;
+            padding: 8px;
+            background: #333;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-content">
+        <div class="canvas-container">
+            <canvas id="gl-canvas" width="1920" height="1080"></canvas>
+            
+            <div class="playback-controls">
+                <button id="play-btn">▶ Play</button>
+                <button id="pause-btn">⏸ Pause</button>
+                <input type="range" id="seek-bar" class="seek-bar" min="0" max="100" value="0">
+                <div class="time-display" id="time-display">0:00 / 0:00</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <div class="control-group">
+            <h3>Video Sources</h3>
+            <div class="video-input">
+                <label for="video1-input" class="file-label">
+                    Load Video 1
+                    <input type="file" id="video1-input" accept="video/*">
+                </label>
+                <div id="video1-status" class="status">No video loaded</div>
+            </div>
+            <div class="video-input">
+                <label for="video2-input" class="file-label">
+                    Load Video 2
+                    <input type="file" id="video2-input" accept="video/*">
+                </label>
+                <div id="video2-status" class="status">No video loaded</div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h3>Adjustments</h3>
+            <div class="slider-control">
+                <label>Brightness</label>
+                <div class="slider-wrapper">
+                    <input type="range" id="brightness" min="-1" max="1" step="0.01" value="0">
+                    <span class="slider-value" id="brightness-value">0.00</span>
+                </div>
+            </div>
+            <div class="slider-control">
+                <label>Contrast</label>
+                <div class="slider-wrapper">
+                    <input type="range" id="contrast" min="0" max="2" step="0.01" value="1">
+                    <span class="slider-value" id="contrast-value">1.00</span>
+                </div>
+            </div>
+            <div class="slider-control">
+                <label>Saturation</label>
+                <div class="slider-wrapper">
+                    <input type="range" id="saturation" min="0" max="2" step="0.01" value="1">
+                    <span class="slider-value" id="saturation-value">1.00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h3>GL Transitions</h3>
+            <select id="transition-select">
+                <option value="none">None</option>
+                <option value="CrossZoom">Cross Zoom</option>
+                <option value="Swirl">Swirl</option>
+                <option value="PageCurl">Page Curl</option>
+                <option value="Glitch">Glitch</option>
+                <option value="FilmBurn">Film Burn</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <h3>Effects</h3>
+            <button id="add-grayscale">Add Grayscale</button>
+            <button id="add-blur" style="margin-left: 5px;">Add Blur</button>
+            <button id="clear-effects" style="margin-left: 5px;">Clear Effects</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/mp4box/dist/mp4box.all.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>

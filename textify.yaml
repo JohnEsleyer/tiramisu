@@ -19,10 +19,24 @@ dirs:
     .:
         enabled: true
         extensions:
-            - json
             - gitignore
             - md
-            - lock
+            - html
             - ts
-            - rs
-            - toml
+            - css
+    docs:
+        enabled: true
+        extensions:
+            - md
+    examples:
+        enabled: true
+        extensions:
+            - md
+            - ts
+            - html
+            - css
+    src:
+        enabled: true
+        extensions:
+            - ts
+            - html

@@ -3,7 +3,7 @@ import { TiramisuBrowser } from "./Browser.js";
 import { TiramisuEncoder } from "./Encoder.js";
 import { TiramisuCLI } from "./CLI.js";
 import { AudioAnalyzer } from "./AudioAnalysis.js";
-import { spawn } from "bun";
+import { spawn } from "node:child_process";
 import { unlinkSync, writeFileSync } from "fs";
 import type {
     RenderConfig,
@@ -98,7 +98,7 @@ export class Tiramisu<T = any> {
 
         for (let i = 0; i < totalFrames; i++) {
             const vMap: Record<string, string> = {};
-            videoPaths.forEach(p => vMap[p] = p);
+            videoPaths.forEach(p => vMap[p] = `${url}/${p}`);
 
             const { rms, bands } = audioAnalysisData[i] || {
                 rms: 0,
@@ -265,8 +265,14 @@ export class Tiramisu<T = any> {
 
         finalArgs.push(outputFile!);
 
-        const proc = spawn(finalArgs);
-        await proc.exited;
+        const proc = spawn(finalArgs[0], finalArgs.slice(1));
+        await new Promise<void>((resolve, reject) => {
+            proc.on('close', (code) => {
+                if (code === 0) resolve();
+                else reject(new Error(`FFmpeg exited with code ${code}`));
+            });
+            proc.on('error', reject);
+        });
 
         chunkFiles.forEach((f) => {
             try { unlinkSync(f); } catch (e) {}

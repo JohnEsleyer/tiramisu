@@ -1,4 +1,4 @@
-import { TiramisuPlayer } from "../../src/Client";
+import { TiramisuPlayer } from "../../src/Client.js";
 
 const canvasId = "preview-canvas";
 
@@ -166,25 +166,29 @@ const grayscaleCheck = document.getElementById("grayscale-check") as HTMLInputEl
 const btnPlay = document.getElementById("btn-play") as HTMLButtonElement;
 
 blurRange.addEventListener("input", (e) => {
-    playerState.blur = parseFloat(e.target.value);
+    const target = e.target as HTMLInputElement;
+    playerState.blur = parseFloat(target.value);
     blurValue.textContent = `${playerState.blur}px`;
     if (!(player as any).isPlaying) player.renderFrame(Math.floor((player as any).pausedAt * 30));
 });
 
 brightnessRange.addEventListener("input", (e) => {
-    playerState.brightness = parseFloat(e.target.value);
+    const target = e.target as HTMLInputElement;
+    playerState.brightness = parseFloat(target.value);
     brightnessValue.textContent = playerState.brightness.toFixed(2);
     if (!(player as any).isPlaying) player.renderFrame(Math.floor((player as any).pausedAt * 30));
 });
 
 contrastRange.addEventListener("input", (e) => {
-    playerState.contrast = parseFloat(e.target.value);
+    const target = e.target as HTMLInputElement;
+    playerState.contrast = parseFloat(target.value);
     contrastValue.textContent = playerState.contrast.toFixed(1);
     if (!(player as any).isPlaying) player.renderFrame(Math.floor((player as any).pausedAt * 30));
 });
 
 grayscaleCheck.addEventListener("change", (e) => {
-    playerState.grayscale = e.target.checked;
+    const target = e.target as HTMLInputElement;
+    playerState.grayscale = target.checked;
     if (!(player as any).isPlaying) player.renderFrame(Math.floor((player as any).pausedAt * 30));
 });
 

@@ -1,4 +1,4 @@
-import { TiramisuPlayer } from "../../src/Client";
+import { TiramisuPlayer } from "../../src/Client.js";
 
 const canvasId = "preview-canvas";
 const videoUrl = "/flower.mp4"; // Point to the local file

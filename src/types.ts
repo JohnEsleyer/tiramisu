@@ -20,6 +20,14 @@ export interface RenderConfig<T = any> {
     canvas?: HTMLCanvasElement | string;
     /** Number of parallel workers. Defaults to CPU core count. */
     parallel?: number;
+    
+    // WebGL-specific options
+    /** Enable WebGL rendering (default: true) */
+    webgl?: boolean;
+    /** WebGL context attributes */
+    webglContextAttributes?: WebGLContextAttributes;
+    /** Enable WebCodecs for video processing (default: true) */
+    webcodecs?: boolean;
 }
 
 export interface WorkerPayload {
@@ -51,6 +59,15 @@ export interface Layer {
     applyGrayscale: () => void;
 }
 
+// WebGL-specific Layer (texture-based)
+export interface WebGLLayer {
+    texture: WebGLTexture;
+    width: number;
+    height: number;
+    clear: () => void;
+    applyShader: (shaderId: string, uniforms: Record<string, any>) => void;
+}
+
 export interface RenderContext<T = any> {
     frame: number;
     progress: number;
@@ -72,7 +89,21 @@ export interface RenderContext<T = any> {
     };
 }
 
+export interface WebGLRenderContext<T = any> extends RenderContext<T> {
+    gl: WebGL2RenderingContext;
+    program: WebGLProgram;
+    // Helper to apply a shader to a texture
+    applyShader: (shaderId: string, uniforms: Record<string, any>) => void;
+    // Current frame as a texture
+    sourceTexture: WebGLTexture;
+    // WebGL layer creation
+    webglLayer: {
+        create: (width?: number, height?: number) => WebGLLayer;
+    };
+}
+
 export type DrawFunction<T = any> = (context: RenderContext<T>) => void;
+export type WebGLDrawFunction<T = any> = (context: WebGLRenderContext<T>) => void;
 
 export interface Clip<T = any> {
     id: string;
@@ -80,4 +111,55 @@ export interface Clip<T = any> {
     endFrame: number;
     zIndex: number;
     drawFunction: string | DrawFunction<T>;
+}
+
+// WebGL-specific interfaces
+export interface ShaderProgram {
+    id: string;
+    program: WebGLProgram;
+    uniforms: Map<string, WebGLUniformLocation>;
+    attributes: Map<string, number>;
+}
+
+export interface VideoFrameInfo {
+    frame: VideoFrame;
+    timestamp: number;
+    texture?: WebGLTexture;
+}
+
+export interface TexturePool {
+    getTexture: () => WebGLTexture | null;
+    releaseTexture: (texture: WebGLTexture) => void;
+    clear: () => void;
+}
+
+export interface ITextureManager {
+    uploadVideoFrame(frame: VideoFrame): WebGLTexture;
+}
+
+export interface GOPManager {
+    keyframes: number[];
+    seekToFrame: (frameNumber: number) => Promise<void>;
+    getCurrentFrame: () => VideoFrame | null;
+}
+
+// WebCodecs configuration
+export interface WebCodecsConfig {
+    codec: string;
+    width: number;
+    height: number;
+    bitrate?: number;
+    framerate?: number;
+    description?: BufferSource;
+}
+
+// Shader uniform types
+export type ShaderUniform = number | number[] | boolean | WebGLTexture;
+
+// Effect configuration
+export interface Effect {
+    id: string;
+    shaderId: string;
+    uniforms: Record<string, ShaderUniform>;
+    enabled: boolean;
 }

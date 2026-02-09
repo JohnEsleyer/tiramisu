@@ -1,4 +1,4 @@
-import { TiramisuPlayer } from "../../src/Client";
+import { TiramisuPlayer } from "../../src/Client.js";
 
 const canvasId = "preview-canvas";
 const videoInput = document.getElementById("video-input") as HTMLInputElement;

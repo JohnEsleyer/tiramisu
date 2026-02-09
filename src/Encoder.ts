@@ -1,4 +1,8 @@
-import { spawn, $ } from "bun";
+import { spawn } from "node:child_process";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
+
+const execAsync = promisify(exec);
 
 export class TiramisuEncoder {
     private process: any;
@@ -71,10 +75,8 @@ export class TiramisuEncoder {
 
         ffmpegArgs.push(outputFile);
 
-        this.process = spawn(ffmpegArgs, {
-            stdin: "pipe",
-            stdout: "ignore",
-            stderr: "inherit",
+        this.process = spawn(ffmpegArgs[0], ffmpegArgs.slice(1), {
+            stdio: ["pipe", "ignore", "inherit"]
         });
     }
 
@@ -84,24 +86,27 @@ export class TiramisuEncoder {
     private async getBestCodec(): Promise<string> {
         try {
             // 1. Check for NVIDIA NVENC
-            const hasNvenc = (await $`ffmpeg -encoders`.text()).includes(
-                "h264_nvenc",
-            );
+            const { stdout: encodersOutput } = await execAsync("ffmpeg -encoders");
+            const hasNvenc = encodersOutput.includes("h264_nvenc");
             if (hasNvenc) {
                 // TEST if it actually works (prevents the libcuda.so.1 error)
-                const testNvenc =
-                    await $`ffmpeg -f lavfi -i color=c=black:s=64x64:d=0.1 -c:v h264_nvenc -f null -`.nothrow();
-                if (testNvenc.exitCode === 0) return "h264_nvenc";
+                try {
+                    await execAsync("ffmpeg -f lavfi -i color=c=black:s=64x64:d=0.1 -c:v h264_nvenc -f null -");
+                    return "h264_nvenc";
+                } catch {
+                    // NVENC test failed, continue to next option
+                }
             }
 
             // 2. Check for Apple Silicon / Mac Hardware acceleration
-            const hasVt = (await $`ffmpeg -encoders`.text()).includes(
-                "h264_videotoolbox",
-            );
+            const hasVt = encodersOutput.includes("h264_videotoolbox");
             if (hasVt) {
-                const testVt =
-                    await $`ffmpeg -f lavfi -i color=c=black:s=64x64:d=0.1 -c:v h264_videotoolbox -f null -`.nothrow();
-                if (testVt.exitCode === 0) return "h264_videotoolbox";
+                try {
+                    await execAsync("ffmpeg -f lavfi -i color=c=black:s=64x64:d=0.1 -c:v h264_videotoolbox -f null -");
+                    return "h264_videotoolbox";
+                } catch {
+                    // VideoToolbox test failed, continue to next option
+                }
             }
         } catch (e) {
             // Fallback to CPU if probe fails
@@ -117,8 +122,18 @@ export class TiramisuEncoder {
 
     public async close() {
         if (this.process?.stdin) {
-            await this.process.stdin.end();
+            this.process.stdin.end();
         }
-        await this.process?.exited;
+        await new Promise<void>((resolve, reject) => {
+            if (!this.process) {
+                resolve();
+                return;
+            }
+            this.process.on('close', (code: number | null) => {
+                if (code === 0) resolve();
+                else reject(new Error(`FFmpeg exited with code ${code}`));
+            });
+            this.process.on('error', reject);
+        });
     }
 }

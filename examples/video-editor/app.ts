@@ -1,6 +1,6 @@
 // Simulating importing from the library
-import { TiramisuPlayer } from "../../src/Client";
-import type { DrawFunction } from "../../src/types";
+import { TiramisuPlayer } from "../../src/Client.js";
+import type { DrawFunction } from "../../src/types.js";
 
 // --- Configuration ---
 const DURATION = 5;

@@ -1,5 +1,5 @@
-import { TiramisuPlayer } from "../../src/Client";
-import type { DrawFunction } from "../../src/types";
+import { TiramisuPlayer } from "../../src/Client.js";
+import type { DrawFunction } from "../../src/types.js";
 
 // --- UI Elements ---
 const canvasId = "preview-canvas";

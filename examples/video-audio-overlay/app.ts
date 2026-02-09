@@ -1,4 +1,4 @@
-import { TiramisuPlayer } from "../../src/Client";
+import { TiramisuPlayer } from "../../src/Client.js";
 
 // --- UI Elements ---
 const canvasId = "preview-canvas";

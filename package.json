@@ -1,44 +1,74 @@
 {
     "name": "tiramisu",
-    "version": "1.0.1",
-    "description": "Programmatic video creation engine using Canvas API and FFmpeg",
+    "version": "2.0.0",
+    "description": "WebGL-powered video creation engine with WebCodecs integration",
     "type": "module",
-    "main": "./index.ts",
-    "types": "./index.ts",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
     "exports": {
         ".": {
-            "types": "./index.ts",
-            "import": "./index.ts"
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
         },
         "./client": {
-            "types": "./src/Client.ts",
-            "import": "./src/Client.ts"
+            "types": "./dist/Client.d.ts",
+            "import": "./dist/Client.js"
         },
         "./types": {
-            "types": "./src/types.ts",
-            "import": "./src/types.ts"
+            "types": "./dist/types.d.ts",
+            "import": "./dist/types.js"
+        },
+        "./webgl": {
+            "types": "./dist/webgl/index.d.ts",
+            "import": "./dist/webgl/index.js"
         }
     },
     "files": [
-        "src",
-        "index.ts",
+        "dist",
         "README.md"
     ],
     "scripts": {
         "clean": "rm -rf dist",
-        "build:wasm": "cd src/rust_audio && cargo build --target wasm32-unknown-unknown --release && cd ../.. && wasm-bindgen src/rust_audio/target/wasm32-unknown-unknown/release/tiramisu_audio_analyzer.wasm --out-dir ./src/wasm --target nodejs",
-        "build": "bun run build:wasm"
+        "build": "pnpm run clean && tsc && esbuild dist/index.js --bundle --format=esm --platform=node --outfile=dist/bundle.js",
+        "build:wasm": "cd docs && make && cd ..",
+        "dev": "tsx examples/dev-server.ts",
+        "dev:server": "tsx examples/dev-server.ts",
+        "dev:watch": "tsc --watch",
+        "dev:visualizer": "tsx examples/dev-server.ts --example=MusicVisualizer",
+        "dev:meme": "tsx examples/dev-server.ts --example=MemeGenerator",
+        "dev:snow": "tsx examples/dev-server.ts --example=SnowOverlay",
+        "dev:webgl": "tsx examples/dev-server.ts --example=WebGLEditor",
+        "lint": "eslint src --ext .ts",
+        "typecheck": "tsc --noEmit"
     },
+    "keywords": [
+        "video",
+        "webgl",
+        "webcodecs",
+        "editor",
+        "rendering",
+        "typescript"
+    ],
+    "author": "Tiramisu",
+    "license": "MIT",
     "peerDependencies": {
         "typescript": "^5.0.0"
     },
+    "packageManager": "pnpm@8.0.0",
     "dependencies": {
         "mp4box": "^2.3.0",
-        "puppeteer": "^24.36.1"
+        "puppeteer": "^22.0.0"
     },
     "devDependencies": {
-        "@types/bun": "^1.3.8",
         "@types/node": "^22.0.0",
-        "typescript": "^5.7.0"
+        "@typescript-eslint/eslint-plugin": "^6.0.0",
+        "@typescript-eslint/parser": "^6.0.0",
+        "eslint": "^8.0.0",
+        "typescript": "^5.7.0",
+        "tsx": "^4.7.1",
+        "esbuild": "^0.20.1"
+    },
+    "engines": {
+        "node": ">=18.0.0"
     }
 }
