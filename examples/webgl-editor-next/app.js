@@ -17,10 +17,27 @@ const state = {
   fpsSamples: [],
   canvas: null,
   uniform: {},
-  initError: null
+  initError: null,
+  screen: {
+    width: 1920,
+    height: 1080,
+    fit: 'contain'
+  }
 };
 
 const ui = {};
+let tabButtons = [];
+let tabSections = [];
+let screenApplyTimer = null;
+
+const SCREEN_SIZES = [
+  { label: '1920x1080', width: 1920, height: 1080 },
+  { label: '1280x720', width: 1280, height: 720 },
+  { label: '2560x1440', width: 2560, height: 1440 },
+  { label: '3840x2160', width: 3840, height: 2160 },
+  { label: '1080x1920', width: 1080, height: 1920 },
+  { label: '1080x1080', width: 1080, height: 1080 }
+];
 
 const vertexSrc = `#version 300 es
 in vec2 a_position;
@@ -123,6 +140,14 @@ function initUI() {
   ui.timecode = $('timecode');
   ui.fps = $('fps');
   ui.engine = $('engine-state');
+  ui.screenBadge = $('screen-badge');
+  ui.screenSize = $('screen-size');
+  ui.fitMode = $('fit-mode');
+  ui.screenWidth = $('screen-width');
+  ui.screenHeight = $('screen-height');
+  ui.screenApply = $('screen-apply');
+  ui.screenStatus = $('screen-status');
+  ui.screenAspect = $('screen-aspect');
   ui.export = $('export');
   ui.exportStatus = $('export-status');
   ui.exportModal = $('export-modal');
@@ -131,6 +156,8 @@ function initUI() {
   ui.exportProgress = $('export-progress-fill');
   ui.statusA = $('status-a');
   ui.statusB = $('status-b');
+  ui.ratioA = $('ratio-a');
+  ui.ratioB = $('ratio-b');
   ui.sampleA = $('sample-a');
   ui.sampleB = $('sample-b');
   ui.fileA = $('file-a');
@@ -139,6 +166,9 @@ function initUI() {
   ui.laneB = $('lane-b');
   ui.playheadA = $('playhead-a');
   ui.playheadB = $('playhead-b');
+
+  tabButtons = Array.from(document.querySelectorAll('[data-tab]'));
+  tabSections = Array.from(document.querySelectorAll('[data-tab-content]'));
 
   ui.controls = {
     a: {
@@ -306,6 +336,7 @@ function loadVideo(index, url, label) {
   return new Promise((resolve, reject) => {
     const onReady = () => {
       status.textContent = `${label} (${formatTime(video.duration)})`;
+      updateAspectWarnings();
       resolve();
     };
     const onError = () => {
@@ -346,6 +377,24 @@ function bindControls() {
   ui.pause.addEventListener('click', () => pause());
   ui.stop.addEventListener('click', () => stop());
   ui.export.addEventListener('click', () => exportServerRender());
+  if (ui.screenSize) {
+    ui.screenSize.addEventListener('change', (e) => setScreenSize(e.target.value));
+  }
+  if (ui.fitMode) {
+    ui.fitMode.addEventListener('change', (e) => setFitMode(e.target.value));
+  }
+  if (ui.screenApply) {
+    ui.screenApply.addEventListener('click', () => applyCustomSize());
+  }
+  if (ui.screenWidth) {
+    ui.screenWidth.addEventListener('input', () => scheduleCustomSizeApply());
+  }
+  if (ui.screenHeight) {
+    ui.screenHeight.addEventListener('input', () => scheduleCustomSizeApply());
+  }
+  tabButtons.forEach((button) => {
+    button.addEventListener('click', () => switchTab(button.dataset.tab));
+  });
   ui.scrub.addEventListener('input', (e) => {
     setPlayhead(parseFloat(e.target.value));
     if (state.playing) {
@@ -373,6 +422,91 @@ function setExportModal(active, title, body) {
   if (title && ui.exportModalTitle) ui.exportModalTitle.textContent = title;
   if (body && ui.exportModalBody) ui.exportModalBody.textContent = body;
   if (!active && ui.exportProgress) ui.exportProgress.style.width = '0%';
+}
+
+function setScreenSize(value) {
+  const size = SCREEN_SIZES.find((item) => item.label === value);
+  if (!size) return;
+  state.screen.width = size.width;
+  state.screen.height = size.height;
+  if (ui.screenWidth) ui.screenWidth.value = String(size.width);
+  if (ui.screenHeight) ui.screenHeight.value = String(size.height);
+  document.documentElement.style.setProperty('--screen-aspect', `${size.width} / ${size.height}`);
+  if (ui.screenBadge) ui.screenBadge.textContent = `${size.width}x${size.height}`;
+  updateScreenUI();
+  resize();
+  if (state.gl) render();
+}
+
+function setFitMode(value) {
+  state.screen.fit = value === 'cover' ? 'cover' : 'contain';
+  updateScreenUI();
+  if (state.gl) render();
+}
+
+function updateScreenUI() {
+  const { width, height } = state.screen;
+  const aspect = width / height;
+  if (ui.screenStatus) ui.screenStatus.textContent = `Screen ${width}x${height}`;
+  if (ui.screenAspect) ui.screenAspect.textContent = `Aspect ${formatAspectRatio(width, height)} (${aspect.toFixed(2)})`;
+  updateAspectWarnings();
+}
+
+function scheduleCustomSizeApply() {
+  if (screenApplyTimer) {
+    clearTimeout(screenApplyTimer);
+  }
+  screenApplyTimer = setTimeout(() => {
+    screenApplyTimer = null;
+    applyCustomSize();
+  }, 150);
+}
+
+function switchTab(tabId) {
+  if (!tabId) return;
+  tabButtons.forEach((button) => {
+    button.classList.toggle('active', button.dataset.tab === tabId);
+  });
+  tabSections.forEach((section) => {
+    section.hidden = section.dataset.tabContent !== tabId;
+  });
+}
+
+function applyCustomSize() {
+  const width = parseInt(ui.screenWidth?.value || '', 10);
+  const height = parseInt(ui.screenHeight?.value || '', 10);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width < 320 || height < 240) {
+    return;
+  }
+  state.screen.width = width;
+  state.screen.height = height;
+  if (ui.screenSize) ui.screenSize.value = '';
+  document.documentElement.style.setProperty('--screen-aspect', `${width} / ${height}`);
+  if (ui.screenBadge) ui.screenBadge.textContent = `${width}x${height}`;
+  updateScreenUI();
+  resize();
+  if (state.gl) render();
+}
+
+function updateAspectWarnings() {
+  const screenAspect = state.screen.width / state.screen.height;
+  [0, 1].forEach((index) => {
+    const video = state.videos[index];
+    const label = index === 0 ? ui.ratioA : ui.ratioB;
+    if (!label) return;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      label.textContent = '';
+      return;
+    }
+    const videoAspect = video.videoWidth / video.videoHeight;
+    const diff = Math.abs(videoAspect - screenAspect);
+    if (diff < 0.02) {
+      label.textContent = `Aspect match: ${formatAspectRatio(video.videoWidth, video.videoHeight)}`;
+      return;
+    }
+    const modeLabel = state.screen.fit === 'cover' ? 'Crop to Fill' : 'Maintain Ratio';
+    label.textContent = `Aspect mismatch: video ${formatAspectRatio(video.videoWidth, video.videoHeight)} vs screen ${formatAspectRatio(state.screen.width, state.screen.height)}. ${modeLabel} applied.`;
+  });
 }
 
 async function exportServerRender() {
@@ -452,11 +586,12 @@ async function buildExportPayload() {
   }
 
   return {
-    resolution: '1280x720',
+    resolution: `${state.screen.width}x${state.screen.height}`,
     fps: 30,
     duration: Number(state.duration) || 10,
     clips,
-    sources
+    sources,
+    screen: { ...state.screen }
   };
 }
 
@@ -537,6 +672,18 @@ async function setExportState(payload) {
   if (payload.duration) {
     state.duration = Number(payload.duration) || state.duration;
     ui.scrub.max = state.duration.toFixed(2);
+  }
+
+  if (payload.screen && payload.screen.width && payload.screen.height) {
+    state.screen.width = payload.screen.width;
+    state.screen.height = payload.screen.height;
+    state.screen.fit = payload.screen.fit === 'cover' ? 'cover' : 'contain';
+    if (ui.screenSize) ui.screenSize.value = `${state.screen.width}x${state.screen.height}`;
+    if (ui.fitMode) ui.fitMode.value = state.screen.fit;
+    if (ui.screenWidth) ui.screenWidth.value = String(state.screen.width);
+    if (ui.screenHeight) ui.screenHeight.value = String(state.screen.height);
+    setScreenSize(`${state.screen.width}x${state.screen.height}`);
+    setFitMode(state.screen.fit);
   }
 
   updateTimeline();
@@ -738,15 +885,40 @@ function applyClipUniforms(clip, index) {
   const active = video && isClipActive(clip, state.playhead) ? 1 : 0;
 
   const prefix = index === 0 ? '0' : '1';
+  const fitScale = getFitScale(video);
+  const scaleX = clip.scale * fitScale.x;
+  const scaleY = clip.scale * fitScale.y;
 
   state.gl.uniform1f(u[`u_active${prefix}`], active);
   state.gl.uniform1f(u[`u_opacity${prefix}`], clip.opacity);
-  state.gl.uniform2f(u[`u_scale${prefix}`], clip.scale, clip.scale);
+  state.gl.uniform2f(u[`u_scale${prefix}`], scaleX, scaleY);
   state.gl.uniform2f(u[`u_translate${prefix}`], clip.x, clip.y);
   state.gl.uniform1f(u[`u_rotate${prefix}`], clip.rot);
   state.gl.uniform1f(u[`u_brightness${prefix}`], clip.brightness);
   state.gl.uniform1f(u[`u_contrast${prefix}`], clip.contrast);
   state.gl.uniform1f(u[`u_saturation${prefix}`], clip.saturation);
+}
+
+function getFitScale(video) {
+  if (!video || !video.videoWidth || !video.videoHeight) {
+    return { x: 1, y: 1 };
+  }
+  const screenAspect = state.screen.width / state.screen.height;
+  const videoAspect = video.videoWidth / video.videoHeight;
+  if (Math.abs(screenAspect - videoAspect) < 0.0001) {
+    return { x: 1, y: 1 };
+  }
+  if (state.screen.fit === 'cover') {
+    if (screenAspect > videoAspect) {
+      return { x: 1, y: screenAspect / videoAspect };
+    }
+    return { x: videoAspect / screenAspect, y: 1 };
+  }
+  // contain
+  if (screenAspect > videoAspect) {
+    return { x: videoAspect / screenAspect, y: 1 };
+  }
+  return { x: 1, y: screenAspect / videoAspect };
 }
 
 function isClipActive(clip, time) {
@@ -774,8 +946,21 @@ function formatTime(seconds) {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+function formatAspectRatio(width, height) {
+  if (!width || !height) return 'N/A';
+  const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+  const divisor = gcd(width, height);
+  return `${Math.round(width / divisor)}:${Math.round(height / divisor)}`;
+}
+
 function start() {
   initUI();
+  if (ui.screenSize) ui.screenSize.value = `${state.screen.width}x${state.screen.height}`;
+  if (ui.fitMode) ui.fitMode.value = state.screen.fit;
+  if (ui.screenWidth) ui.screenWidth.value = String(state.screen.width);
+  if (ui.screenHeight) ui.screenHeight.value = String(state.screen.height);
+  setScreenSize(`${state.screen.width}x${state.screen.height}`);
+  setFitMode(state.screen.fit);
   try {
     initGL();
   } catch (error) {
@@ -788,6 +973,7 @@ function start() {
   updateTimecode();
   if (ui.engine && !state.initError) ui.engine.textContent = 'idle';
   if (!state.initError) render();
+  if (tabButtons.length) switchTab(tabButtons[0].dataset.tab);
 
   window.__webglNext = {
     setExportState,
