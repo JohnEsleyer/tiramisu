@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tiramisu - Video Upload Demo</title>
+    <style>
+        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .upload-card { background: #2a2a2a; padding: 20px; border-radius: 8px; border: 2px dashed #444; margin-bottom: 20px; text-align: center; }
+        canvas { background: #000; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 800px; width: 100%; }
+        .controls { margin-top: 20px; display: flex; gap: 10px; align-items: center; }
+        input[type="file"] { margin-bottom: 10px; }
+        .hint { color: #888; font-size: 0.8rem; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <h1>📹 Video Upload & Sync</h1>
+    
+    <div class="upload-card">
+        <p>Select a video to use as background</p>
+        <input type="file" id="video-input" accept="video/*">
+        <div class="hint">The video will be synced to the Tiramisu timeline</div>
+    </div>
+
+    <canvas id="preview-canvas"></canvas>
+
+    <div class="controls">
+    <button id="btn-play">▶ Play / Pause</button>
+    <input type="range" id="seeker" value="0" style="width: 300px;">
+    <!-- Add this -->
+    <button id="btn-render" style="background: #f59e0b; color: black; font-weight: bold;">🎬 Render MP4</button>
+</div>
+    <script type="module" src="bundle.js"></script>
+</body>
+</html>

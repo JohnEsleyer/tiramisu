@@ -291,31 +291,6 @@ export class TiramisuPlayer<T = any> {
 
         this.ctx.clearRect(0, 0, this.config.width, this.config.height);
 
-        // Create layer utility for compositing
-        const layer = {
-            create: (width: number, height: number) => {
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d')!;
-                
-                return {
-                    ctx,
-                    canvas,
-                    create: (w: number, h: number) => layer.create(w, h),
-                    applyBlur: (amount: number) => {
-                        ctx.filter = `blur(${amount}px)`;
-                    },
-                    applyBrightness: (amount: number) => {
-                        ctx.filter = `brightness(${amount})`;
-                    },
-                    drawTo: (targetCtx: CanvasRenderingContext2D) => {
-                        targetCtx.drawImage(canvas, 0, 0);
-                    }
-                };
-            }
-        };
-
         for (const clip of this.clips) {
             // Draw clip if frame is within range (inclusive start, exclusive end)
             // Note: We're expanding the range check slightly for safety
@@ -339,38 +314,9 @@ export class TiramisuPlayer<T = any> {
                         assets: this.loadedAssets,
                         videos: this.loadedVideos,
                         utils: TiramisuUtils,
-                        layer: layer,
                     });
                 }
             }
         }
-    }
-
-    // New methods for the advanced examples
-    public updateData(data: T) {
-        this.config.data = data;
-    }
-
-    public updateConfig(partialConfig: Partial<RenderConfig<T>>) {
-        this.config = { ...this.config, ...partialConfig };
-        
-        if (partialConfig.width || partialConfig.height) {
-            this.canvas.width = this.config.width;
-            this.canvas.height = this.config.height;
-        }
-    }
-
-    public clearClips() {
-        this.clips = [];
-    }
-
-    // Getter for pausedAt (used in examples)
-    public getPausedAt() {
-        return this.pausedAt;
-    }
-
-    // Setter for pausedAt
-    public setPausedAt(time: number) {
-        this.pausedAt = time;
     }
 }
