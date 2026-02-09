@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Media Content Creator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 3s ease infinite;
+        }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .canvas-section {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        #social-canvas {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .sidebar {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .template-section h3 {
+            margin-bottom: 1rem;
+            color: #ffd700;
+        }
+        
+        .template-btn {
+            width: 100%;
+            margin: 0.5rem 0;
+            padding: 1rem;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+        
+        .template-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        
+        .template-btn.active {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border-color: #fff;
+        }
+        
+        .template-info {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-top: 0.5rem;
+        }
+        
+        .controls {
+            margin: 2rem 0;
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 3rem 0;
+        }
+        
+        .feature-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 2rem;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: transform 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .feature-card h4 {
+            margin-bottom: 1rem;
+            color: #ffd700;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+        
+        .stat {
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .real-time-effects {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .effect-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+        
+        .effect-toggle {
+            width: 50px;
+            height: 25px;
+            background: #ccc;
+            border-radius: 25px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        
+        .effect-toggle.active {
+            background: #4ecdc4;
+        }
+        
+        .effect-toggle::after {
+            content: '';
+            width: 21px;
+            height: 21px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s ease;
+        }
+        
+        .effect-toggle.active::after {
+            transform: translateX(25px);
+        }
+        
+        .responsive-warning {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid rgba(255, 193, 7, 0.5);
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+            display: none;
+        }
+        
+        @media (max-width: 1024px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+        
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Social Media Content Creator</h1>
+        <p>Create viral content for all platforms with AI-powered effects and templates</p>
+        
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-number">4</div>
+                <div class="stat-label">Platforms</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">30+</div>
+                <div class="stat-label">Templates</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">∞</div>
+                <div class="stat-label">Possibilities</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="responsive-warning">
+            <p>⚠️ For the best experience, view on desktop. Mobile preview may be limited.</p>
+        </div>
+        
+        <div class="main-layout">
+            <div class="canvas-section">
+                <h2>Live Preview</h2>
+                <canvas id="social-canvas" width="1080" height="1920"></canvas>
+                
+                <div class="controls">
+                    <button class="btn btn-primary" id="play-btn">▶ Play</button>
+                    <button class="btn btn-secondary" id="pause-btn">⏸ Pause</button>
+                    <button class="btn btn-primary" id="render-btn">🎬 Export Video</button>
+                    <button class="btn btn-secondary" id="generate-batch">🚀 Generate 10 Videos</button>
+                </div>
+            </div>
+            
+            <div class="sidebar">
+                <div class="template-section">
+                    <h3>🎯 Platform Templates</h3>
+                    
+                    <button class="template-btn active" data-template="tiktok">
+                        <strong>📱 TikTok</strong>
+                        <div class="template-info">Vertical (9:16) - 15s</div>
+                    </button>
+                    
+                    <button class="template-btn" data-template="instagram">
+                        <strong>📷 Instagram Stories</strong>
+                        <div class="template-info">Square (1:1) - 15s</div>
+                    </button>
+                    
+                    <button class="template-btn" data-template="youtube">
+                        <strong>▶️ YouTube</strong>
+                        <div class="template-info">Horizontal (16:9) - 5s</div>
+                    </button>
+                    
+                    <button class="template-btn" data-template="twitter">
+                        <strong>🐦 Twitter</strong>
+                        <div class="template-info">Horizontal (16:9) - 15s</div>
+                    </button>
+                </div>
+                
+                <div class="real-time-effects">
+                    <h4>🎨 Real-time Effects</h4>
+                    
+                    <div class="effect-item">
+                        <span>Audio Reactive</span>
+                        <div class="effect-toggle active" data-effect="audio-reactive"></div>
+                    </div>
+                    
+                    <div class="effect-item">
+                        <span>Dynamic Text</span>
+                        <div class="effect-toggle active" data-effect="dynamic-text"></div>
+                    </div>
+                    
+                    <div class="effect-item">
+                        <span>Particle System</span>
+                        <div class="effect-toggle" data-effect="particles"></div>
+                    </div>
+                    
+                    <div class="effect-item">
+                        <span>Zoom Effects</span>
+                        <div class="effect-toggle active" data-effect="zoom"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="features">
+            <div class="feature-card">
+                <div class="feature-icon">🎭</div>
+                <h4>Viral Templates</h4>
+                <p>Pre-built templates for TikTok, Instagram, YouTube, and Twitter with proven engagement formulas.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎵</div>
+                <h4>Audio Reactive</h4>
+                <p>Visual effects that sync perfectly with music beats and audio for maximum impact.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h4>Real-time Preview</h4>
+                <p>See exactly how your content will look with zero-latency rendering and instant feedback.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h4>Engagement Optimization</h4>
+                <p>Built-in analytics and A/B testing to maximize reach and engagement across platforms.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🚀</div>
+                <h4>Batch Generation</h4>
+                <p>Create hundreds of variations simultaneously with automated personalization.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h4>Platform Optimized</h4>
+                <p>Automatic aspect ratio conversion and platform-specific optimization for each social network.</p>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="./app.ts"></script>
+    
+    <script>
+        // Responsive handling
+        function checkViewport() {
+            const warning = document.querySelector('.responsive-warning');
+            if (window.innerWidth < 1024) {
+                warning.style.display = 'block';
+            } else {
+                warning.style.display = 'none';
+            }
+        }
+        
+        window.addEventListener('resize', checkViewport);
+        checkViewport();
+        
+        // Effect toggles
+        document.querySelectorAll('.effect-toggle').forEach(toggle => {
+            toggle.addEventListener('click', () => {
+                toggle.classList.toggle('active');
+            });
+        });
+    </script>
+</body>
+</html>
