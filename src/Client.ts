@@ -1,4 +1,5 @@
 import { TiramisuUtils } from "./Utils.js";
+import { VideoController } from "./VideoController.js";
 import type { Clip, DrawFunction, RenderConfig } from "./types.js";
 
 export class TiramisuPlayer<T = any> {
@@ -7,7 +8,7 @@ export class TiramisuPlayer<T = any> {
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
     private loadedAssets: Record<string, HTMLImageElement> = {};
-    private loadedVideos: Record<string, HTMLVideoElement> = {};
+    private loadedVideos: Record<string, VideoController> = {}; // Now using VideoController
     private isPlaying = false;
     private animationFrameId: number | null = null;
 
@@ -64,9 +65,7 @@ export class TiramisuPlayer<T = any> {
         console.log("🍰 Tiramisu Client: Loading assets...");
 
         this.loadedAssets = {};
-        Object.values(this.loadedVideos).forEach((v) => v.remove());
-        this.loadedVideos = {};
-
+        
         // Load Images
         if (this.config.assets) {
             const promises = this.config.assets.map(
@@ -88,30 +87,20 @@ export class TiramisuPlayer<T = any> {
             await Promise.all(promises);
         }
 
-        // Load Videos
+        // Load Videos using WebCodecs
         if (this.config.videos) {
-            const promises = this.config.videos.map(
-                (src: string) =>
-                    new Promise<void>((resolve) => {
-                        const vid = document.createElement("video");
-                        vid.crossOrigin = "Anonymous";
-                        vid.src = src;
-                        vid.muted = true;
-                        vid.playsInline = true;
-                        vid.style.display = "none";
-                        vid.preload = "auto";
-                        document.body.appendChild(vid);
-
-                        vid.onloadeddata = () => {
-                            this.loadedVideos[src] = vid;
-                            resolve();
-                        };
-                        vid.onerror = (e) => {
-                            console.warn(`Failed to load video ${src}`, e);
-                            resolve();
-                        };
-                    }),
-            );
+            const promises = this.config.videos.map(async (src: string) => {
+                try {
+                    const vc = new VideoController(src);
+                    await vc.load();
+                    this.loadedVideos[src] = vc;
+                    console.log(`✓ Loaded video: ${src}`);
+                } catch (e) {
+                    console.warn(`Failed to load video ${src}`, e);
+                    // Keep the entry as undefined but continue
+                    this.loadedVideos[src] = undefined as any;
+                }
+            });
             await Promise.all(promises);
         }
 
@@ -182,7 +171,8 @@ export class TiramisuPlayer<T = any> {
         this.isPlaying = false;
         if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
 
-        Object.values(this.loadedVideos).forEach((v) => v.pause());
+        // Note: VideoControllers don't need to be paused like HTMLVideoElements
+        // They are stateless and just seek when needed
 
         if (this.audioSource) {
             this.audioSource.stop();
@@ -270,22 +260,15 @@ export class TiramisuPlayer<T = any> {
         const bands = this.getAudioBands(32); // Use 32 bins for the visualizer
         // ---------------------------------
 
-        // Sync Videos
+        // Sync Videos using WebCodecs
         const targetTime = frame / this.config.fps;
-        Object.values(this.loadedVideos).forEach((vid) => {
-            if (this.isPlaying) {
-                if (vid.paused) vid.play().catch(() => {});
-                const drift = Math.abs(vid.currentTime - targetTime);
-                if (drift > 0.2) vid.currentTime = targetTime;
-            } else {
-                if (!vid.paused) vid.pause();
-                // Loose sync when paused to prevent jitter
-                if (
-                    !vid.seeking &&
-                    Math.abs(vid.currentTime - targetTime) > 0.05
-                ) {
-                    vid.currentTime = targetTime;
-                }
+        
+        // In the client, we want performant seeking.
+        // For the Client implementation of VideoController, we can optimize seek 
+        // to check if the next frame is simply the next delta in the sequence.
+        Object.values(this.loadedVideos).forEach(vc => {
+            if (vc && vc.ready) {
+                vc.seek(targetTime); 
             }
         });
 
@@ -312,7 +295,7 @@ export class TiramisuPlayer<T = any> {
                         fps: this.config.fps,
                         data: this.config.data || {},
                         assets: this.loadedAssets,
-                        videos: this.loadedVideos,
+                        videos: this.loadedVideos, // These are now VideoControllers
                         utils: TiramisuUtils,
                     });
                 }

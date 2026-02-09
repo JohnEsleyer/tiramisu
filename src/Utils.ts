@@ -8,6 +8,11 @@ const mulberry32 = (a: number) => {
     }
 }
 
+// Helper function to detect VideoController instances
+const isVideoController = (obj: any): boolean => {
+    return obj && typeof obj.draw === 'function' && typeof obj.seek === 'function' && typeof obj.ready !== 'undefined';
+};
+
 export const TiramisuUtils = {
     lerp: (start: number, end: number, t: number) => start * (1 - t) + end * t,
     clamp: (val: number, min: number, max: number) => Math.min(Math.max(val, min), max),
@@ -44,11 +49,22 @@ export const TiramisuUtils = {
      * Scales media to fit entirely within target dimensions with letterboxing.
      * Perfect for vertical videos in landscape canvases.
      */
-    drawMediaFit: (ctx: CanvasRenderingContext2D, media: CanvasImageSource, targetW: number, targetH: number) => {
+    drawMediaFit: (ctx: CanvasRenderingContext2D, media: any, targetW: number, targetH: number) => {
         if (!media) return;
         let sw = 0, sh = 0;
-        if (media instanceof HTMLVideoElement) { sw = media.videoWidth; sh = media.videoHeight; }
-        else if (media instanceof HTMLImageElement) { sw = media.naturalWidth || media.width; sh = media.naturalHeight || media.height; }
+        
+        if (media instanceof HTMLVideoElement) { 
+            sw = media.videoWidth; sh = media.videoHeight; 
+        }
+        else if (media instanceof HTMLImageElement) { 
+            sw = media.naturalWidth || media.width; sh = media.naturalHeight || media.height; 
+        }
+        // Handle New VideoController (Server/Client parity)
+        else if (isVideoController(media)) { 
+            sw = media.width || 0; 
+            sh = media.height || 0; 
+        }
+
         if (sw === 0 || sh === 0) return;
 
         const targetRatio = targetW / targetH;
@@ -66,18 +82,34 @@ export const TiramisuUtils = {
             dx = (targetW - dw) / 2;
             dy = 0;
         }
-        ctx.drawImage(media, dx, dy, dw, dh);
+
+        if (isVideoController(media)) {
+            media.draw(ctx, dx, dy, dw, dh);
+        } else {
+            ctx.drawImage(media, dx, dy, dw, dh);
+        }
     },
 
     /**
      * COVER MODE
      * Scales media to fill the entire target area.
      */
-    drawMediaCover: (ctx: CanvasRenderingContext2D, media: CanvasImageSource, targetW: number, targetH: number) => {
+    drawMediaCover: (ctx: CanvasRenderingContext2D, media: any, targetW: number, targetH: number) => {
         if (!media) return;
         let sw = 0, sh = 0;
-        if (media instanceof HTMLVideoElement) { sw = media.videoWidth; sh = media.videoHeight; }
-        else if (media instanceof HTMLImageElement) { sw = media.naturalWidth || media.width; sh = media.naturalHeight || media.height; }
+        
+        if (media instanceof HTMLVideoElement) { 
+            sw = media.videoWidth; sh = media.videoHeight; 
+        }
+        else if (media instanceof HTMLImageElement) { 
+            sw = media.naturalWidth || media.width; sh = media.naturalHeight || media.height; 
+        }
+        // Handle New VideoController
+        else if (isVideoController(media)) { 
+            sw = media.width || 0; 
+            sh = media.height || 0; 
+        }
+        
         if (sw === 0 || sh === 0) return;
 
         const targetRatio = targetW / targetH;
@@ -85,13 +117,22 @@ export const TiramisuUtils = {
         let dw, dh, dx, dy;
 
         if (sourceRatio > targetRatio) {
-            dh = targetH; dw = targetH * sourceRatio;
-            dx = (targetW - dw) / 2; dy = 0;
+            dh = targetH; 
+            dw = targetH * sourceRatio;
+            dx = (targetW - dw) / 2; 
+            dy = 0;
         } else {
-            dw = targetW; dh = targetW / sourceRatio;
-            dx = 0; dy = (targetH - dh) / 2;
+            dw = targetW; 
+            dh = targetW / sourceRatio;
+            dx = 0; 
+            dy = (targetH - dh) / 2;
         }
-        ctx.drawImage(media, dx, dy, dw, dh);
+
+        if (isVideoController(media)) {
+            media.draw(ctx, dx, dy, dw, dh);
+        } else {
+            ctx.drawImage(media, dx, dy, dw, dh);
+        }
     },
 
     /**
@@ -183,6 +224,11 @@ export const TiramisuUtils = {
 
 export const BROWSER_UTILS_CODE = `
 const mulberry32 = ${mulberry32.toString()};
+
+// Helper function to detect VideoController instances
+const isVideoController = (obj) => {
+    return obj && typeof obj.draw === 'function' && typeof obj.seek === 'function' && typeof obj.ready !== 'undefined';
+};
 
 window.TiramisuUtils = {
     lerp: ${TiramisuUtils.lerp.toString()},
