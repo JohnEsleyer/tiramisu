@@ -271,6 +271,81 @@ export const TiramisuUtils = {
         };
     },
 
+    getFitScale: (opts: {
+        screenWidth: number;
+        screenHeight: number;
+        sourceWidth: number;
+        sourceHeight: number;
+        fit?: "contain" | "cover";
+    }) => {
+        const { screenWidth, screenHeight, sourceWidth, sourceHeight, fit } = opts;
+        if (!screenWidth || !screenHeight || !sourceWidth || !sourceHeight) {
+            return { x: 1, y: 1 };
+        }
+
+        const screenAspect = screenWidth / screenHeight;
+        const sourceAspect = sourceWidth / sourceHeight;
+
+        if (Math.abs(screenAspect - sourceAspect) < 0.0001) {
+            return { x: 1, y: 1 };
+        }
+
+        if (fit === "cover") {
+            if (screenAspect > sourceAspect) {
+                return { x: 1, y: screenAspect / sourceAspect };
+            }
+            return { x: sourceAspect / screenAspect, y: 1 };
+        }
+
+        if (screenAspect > sourceAspect) {
+            return { x: sourceAspect / screenAspect, y: 1 };
+        }
+        return { x: 1, y: screenAspect / sourceAspect };
+    },
+
+    normalizeScreen: (
+        screen: { width?: number; height?: number; fit?: "contain" | "cover" } | undefined,
+        fallback: { width: number; height: number },
+    ) => {
+        const width = Number(screen?.width || fallback?.width || 0) || 0;
+        const height = Number(screen?.height || fallback?.height || 0) || 0;
+        return {
+            width,
+            height,
+            fit: screen?.fit === "cover" ? "cover" : "contain",
+        };
+    },
+
+    computeCanvasDrawRect: (opts: {
+        clip: { scale?: number; x?: number; y?: number; rot?: number };
+        screen: { width: number; height: number; fit?: "contain" | "cover" };
+        sourceWidth: number;
+        sourceHeight: number;
+    }) => {
+        const { clip, screen, sourceWidth, sourceHeight } = opts;
+        const baseScale = Number(clip?.scale ?? 1) || 1;
+        const fitScale = TiramisuUtils.getFitScale({
+            screenWidth: screen?.width,
+            screenHeight: screen?.height,
+            sourceWidth,
+            sourceHeight,
+            fit: screen?.fit === "cover" ? "cover" : "contain",
+        });
+
+        const scaleX = baseScale * fitScale.x;
+        const scaleY = baseScale * fitScale.y;
+
+        return {
+            centerX: (Number(clip?.x ?? 0.5) || 0.5) * (screen?.width || 0),
+            centerY: (Number(clip?.y ?? 0.5) || 0.5) * (screen?.height || 0),
+            drawWidth: (screen?.width || 0) * scaleX,
+            drawHeight: (screen?.height || 0) * scaleY,
+            rotate: Number(clip?.rot ?? 0) || 0,
+            scaleX,
+            scaleY,
+        };
+    },
+
 };
 
 export const BROWSER_UTILS_CODE = `
@@ -293,6 +368,9 @@ window.TiramisuUtils = {
     drawMediaFit: ${TiramisuUtils.drawMediaFit.toString()},
     drawMediaCover: ${TiramisuUtils.drawMediaCover.toString()},
     drawMasked: ${TiramisuUtils.drawMasked.toString()},
-    createLayer: ${TiramisuUtils.createLayer.toString()}
+    createLayer: ${TiramisuUtils.createLayer.toString()},
+    getFitScale: ${TiramisuUtils.getFitScale.toString()},
+    normalizeScreen: ${TiramisuUtils.normalizeScreen.toString()},
+    computeCanvasDrawRect: ${TiramisuUtils.computeCanvasDrawRect.toString()}
 };
 `;

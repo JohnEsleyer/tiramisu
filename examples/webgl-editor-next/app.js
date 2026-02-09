@@ -1,3 +1,5 @@
+import { computeClipTransform } from '../shared/coords.js';
+
 const SAMPLE_A = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 const SAMPLE_B = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4';
 
@@ -147,6 +149,8 @@ function initUI() {
   ui.screenApply = $('screen-apply');
   ui.screenStatus = $('screen-status');
   ui.screenAspect = $('screen-aspect');
+  ui.screenFrame = $('screen-frame');
+  ui.stage = $('stage');
   ui.export = $('export');
   ui.exportStatus = $('export-status');
   ui.exportModal = $('export-modal');
@@ -307,6 +311,7 @@ function createTexture(gl) {
 }
 
 function resize() {
+  updateScreenFrame();
   const canvas = state.canvas;
   if (!canvas) return;
   const rect = canvas.parentElement.getBoundingClientRect();
@@ -314,6 +319,32 @@ function resize() {
   canvas.width = Math.floor(rect.width * dpr);
   canvas.height = Math.floor(rect.height * dpr);
   state.gl.viewport(0, 0, canvas.width, canvas.height);
+}
+
+function updateScreenFrame() {
+  const frame = ui.screenFrame;
+  const stage = ui.stage;
+  if (!frame || !stage) return;
+  const rect = stage.getBoundingClientRect();
+  const style = getComputedStyle(stage);
+  const padX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+  const padY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+  const availableWidth = Math.max(0, rect.width - padX);
+  const availableHeight = Math.max(0, rect.height - padY);
+  const aspect = state.screen.width / state.screen.height;
+
+  if (!Number.isFinite(aspect) || aspect <= 0) return;
+
+  let targetWidth = availableWidth;
+  let targetHeight = targetWidth / aspect;
+
+  if (targetHeight > availableHeight) {
+    targetHeight = availableHeight;
+    targetWidth = targetHeight * aspect;
+  }
+
+  frame.style.width = `${Math.floor(targetWidth)}px`;
+  frame.style.height = `${Math.floor(targetHeight)}px`;
 }
 
 function makeVideo() {
@@ -900,40 +931,22 @@ function applyClipUniforms(clip, index) {
   const active = video && isClipActive(clip, state.playhead) ? 1 : 0;
 
   const prefix = index === 0 ? '0' : '1';
-  const fitScale = getFitScale(video);
-  const scaleX = clip.scale * fitScale.x;
-  const scaleY = clip.scale * fitScale.y;
+  const screen = state.screen;
+  const transform = computeClipTransform({
+    clip,
+    screen,
+    sourceWidth: video?.videoWidth || screen.width,
+    sourceHeight: video?.videoHeight || screen.height
+  });
 
   state.gl.uniform1f(u[`u_active${prefix}`], active);
   state.gl.uniform1f(u[`u_opacity${prefix}`], clip.opacity);
-  state.gl.uniform2f(u[`u_scale${prefix}`], scaleX, scaleY);
-  state.gl.uniform2f(u[`u_translate${prefix}`], clip.x, clip.y);
-  state.gl.uniform1f(u[`u_rotate${prefix}`], clip.rot);
+  state.gl.uniform2f(u[`u_scale${prefix}`], transform.scaleX, transform.scaleY);
+  state.gl.uniform2f(u[`u_translate${prefix}`], transform.translateX, transform.translateY);
+  state.gl.uniform1f(u[`u_rotate${prefix}`], transform.rotate);
   state.gl.uniform1f(u[`u_brightness${prefix}`], clip.brightness);
   state.gl.uniform1f(u[`u_contrast${prefix}`], clip.contrast);
   state.gl.uniform1f(u[`u_saturation${prefix}`], clip.saturation);
-}
-
-function getFitScale(video) {
-  if (!video || !video.videoWidth || !video.videoHeight) {
-    return { x: 1, y: 1 };
-  }
-  const screenAspect = state.screen.width / state.screen.height;
-  const videoAspect = video.videoWidth / video.videoHeight;
-  if (Math.abs(screenAspect - videoAspect) < 0.0001) {
-    return { x: 1, y: 1 };
-  }
-  if (state.screen.fit === 'cover') {
-    if (screenAspect > videoAspect) {
-      return { x: 1, y: screenAspect / videoAspect };
-    }
-    return { x: videoAspect / screenAspect, y: 1 };
-  }
-  // contain
-  if (screenAspect > videoAspect) {
-    return { x: videoAspect / screenAspect, y: 1 };
-  }
-  return { x: 1, y: screenAspect / videoAspect };
 }
 
 function isClipActive(clip, time) {

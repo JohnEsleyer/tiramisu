@@ -162,7 +162,12 @@ const server = http.createServer(async (req, res) => {
                         durationSeconds: duration,
                         outputFile: outputPath,
                         videos: videoPaths,
-                        data: { clips, sources: resolvedSources, useVideoElement: true },
+                        data: {
+                            clips,
+                            sources: resolvedSources,
+                            screen: body?.screen,
+                            useVideoElement: true,
+                        },
                     });
 
                     engine.addClip(0, duration, ({ ctx, width, height, frame, fps, data, videos, utils }) => {
@@ -173,6 +178,7 @@ const server = http.createServer(async (req, res) => {
                         const time = frame / fps;
                         const layers = Array.isArray(data?.clips) ? data.clips : [];
                         const sources = Array.isArray(data?.sources) ? data.sources : [];
+                        const screen = utils.normalizeScreen(data?.screen, { width, height });
 
                         layers.forEach((clip: any, index: number) => {
                             if (!clip) return;
@@ -185,10 +191,14 @@ const server = http.createServer(async (req, res) => {
                             if (!video) return;
 
                             const opacity = Number(clip.opacity ?? 1);
-                            const scale = Number(clip.scale ?? 1);
-                            const x = Number(clip.x ?? 0.5) * width;
-                            const y = Number(clip.y ?? 0.5) * height;
-                            const rot = Number(clip.rot ?? 0);
+                            const sourceWidth = Number(video.videoWidth || width);
+                            const sourceHeight = Number(video.videoHeight || height);
+                            const rect = utils.computeCanvasDrawRect({
+                                clip,
+                                screen,
+                                sourceWidth,
+                                sourceHeight,
+                            });
                             const brightness = Number(clip.brightness ?? 0);
                             const contrast = Number(clip.contrast ?? 1);
                             const saturation = Number(clip.saturation ?? 1);
@@ -199,12 +209,16 @@ const server = http.createServer(async (req, res) => {
 
                             ctx.save();
                             ctx.globalAlpha = opacity;
-                            ctx.translate(x, y);
-                            ctx.rotate(rot);
-                            ctx.scale(scale, scale);
-                            ctx.translate(-width / 2, -height / 2);
+                            ctx.translate(rect.centerX, rect.centerY);
+                            ctx.rotate(rect.rotate);
                             ctx.filter = `brightness(${brightnessFactor}) contrast(${contrastFactor}) saturate(${saturationFactor})`;
-                            ctx.drawImage(video, 0, 0, width, height);
+                            ctx.drawImage(
+                                video,
+                                -rect.drawWidth / 2,
+                                -rect.drawHeight / 2,
+                                rect.drawWidth,
+                                rect.drawHeight,
+                            );
                             ctx.restore();
                         });
                     }, 0);
