@@ -124,25 +124,30 @@ export const TiramisuUtils = {
 
 };
 
-export const BROWSER_UTILS_CODE = `
-const mulberry32 = ${mulberry32.toString()};
+const mulberry32Source = mulberry32
+    .toString()
+    .replace(/^export\s+/, "")
+    .replace(/^const\s+\w+\s*=\s*/, "");
 
-window.TiramisuUtils = {
-    lerp: ${TiramisuUtils.lerp.toString()},
-    clamp: ${TiramisuUtils.clamp.toString()},
-    remap: ${TiramisuUtils.remap.toString()},
-    toRad: ${TiramisuUtils.toRad.toString()},
-    easeInQuad: ${TiramisuUtils.easeInQuad.toString()},
-    easeOutQuad: ${TiramisuUtils.easeOutQuad.toString()},
-    easeInOutQuad: ${TiramisuUtils.easeInOutQuad.toString()},
-    easeInCubic: ${TiramisuUtils.easeInCubic.toString()},
-    easeOutCubic: ${TiramisuUtils.easeOutCubic.toString()},
-    easeOutBounce: ${TiramisuUtils.easeOutBounce.toString()},
-    // Pass the generator function creator for deterministic randomness
-    seededRandomGenerator: mulberry32, 
-    drawRoundedRect: ${TiramisuUtils.drawRoundedRect.toString()},
-    drawMediaFit: ${TiramisuUtils.drawMediaFit.toString()},
-    drawMediaCover: ${TiramisuUtils.drawMediaCover.toString()},
-    drawMasked: ${TiramisuUtils.drawMasked.toString()}
-};
+export const BROWSER_UTILS_CODE = `
+    const mulberry32 = ${mulberry32Source};
+
+    window.TiramisuUtils = {
+        lerp: ${TiramisuUtils.lerp.toString()},
+        clamp: ${TiramisuUtils.clamp.toString()},
+        remap: ${TiramisuUtils.remap.toString()},
+        toRad: ${TiramisuUtils.toRad.toString()},
+        easeInQuad: ${TiramisuUtils.easeInQuad.toString()},
+        easeOutQuad: ${TiramisuUtils.easeOutQuad.toString()},
+        easeInOutQuad: ${TiramisuUtils.easeInOutQuad.toString()},
+        easeInCubic: ${TiramisuUtils.easeInCubic.toString()},
+        easeOutCubic: ${TiramisuUtils.easeOutCubic.toString()},
+        easeOutBounce: ${TiramisuUtils.easeOutBounce.toString()},
+        // Pass the generator function creator for deterministic randomness
+        seededRandomGenerator: mulberry32,
+        drawRoundedRect: ${TiramisuUtils.drawRoundedRect.toString()},
+        drawMediaFit: ${TiramisuUtils.drawMediaFit.toString()},
+        drawMediaCover: ${TiramisuUtils.drawMediaCover.toString()},
+        drawMasked: ${TiramisuUtils.drawMasked.toString()}
+    };
 `;
