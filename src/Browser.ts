@@ -135,6 +135,13 @@ export class TiramisuBrowser {
                                 assets: win.loadedAssets,
                                 videos: win.loadedVideos,
                                 utils: win.TiramisuUtils,
+                                layer: {
+                                    create: (lw?: number, lh?: number) => {
+                                        const layerWidth = lw ?? w;
+                                        const layerHeight = lh ?? h;
+                                        return win.TiramisuUtils.createLayer(layerWidth, layerHeight);
+                                    },
+                                },
                             });
                         }
                     }
