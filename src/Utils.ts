@@ -122,6 +122,63 @@ export const TiramisuUtils = {
         ctx.drawImage(buffer, 0, 0);
     },
 
+    // --- Phase 1: Compositing & Layers ---
+
+    /**
+     * Creates a new offscreen layer (canvas)
+     * Useful for isolating elements and applying filters before compositing
+     */
+    createLayer: (w: number, h: number) => {
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        return { canvas: c, ctx: c.getContext('2d')!, width: w, height: h };
+    },
+
+    /**
+     * Applies a destructive filter to the layer immediately
+     * This modifies the layer's pixels - useful for chaining effects
+     * Examples: "blur(10px)", "grayscale(100%)", "brightness(0.8)"
+     */
+    applyFilter: (layer: { canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D }, filterStr: string) => {
+        const { canvas, ctx } = layer;
+        
+        // 1. Create temp buffer to hold current state
+        const temp = document.createElement('canvas');
+        temp.width = canvas.width; 
+        temp.height = canvas.height;
+        const tCtx = temp.getContext('2d')!;
+        tCtx.drawImage(canvas, 0, 0);
+
+        // 2. Clear original
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 3. Draw back with filter
+        ctx.save();
+        ctx.filter = filterStr;
+        ctx.drawImage(temp, 0, 0);
+        ctx.restore();
+    },
+
+    /**
+     * Composites a layer onto the destination context with options
+     * Supports opacity, blend modes, filters, and positioning
+     */
+    drawLayer: (
+        destCtx: CanvasRenderingContext2D, 
+        layer: { canvas: HTMLCanvasElement }, 
+        options: { x?: number, y?: number, opacity?: number, blendMode?: GlobalCompositeOperation, filter?: string } = {}
+    ) => {
+        const { x = 0, y = 0, opacity = 1, blendMode = 'source-over', filter = 'none' } = options;
+        
+        destCtx.save();
+        destCtx.globalAlpha = opacity;
+        destCtx.globalCompositeOperation = blendMode;
+        destCtx.filter = filter;
+        destCtx.drawImage(layer.canvas, x, y);
+        destCtx.restore();
+    }
+
 };
 
 export const BROWSER_UTILS_CODE = `
@@ -143,6 +200,11 @@ window.TiramisuUtils = {
     drawRoundedRect: ${TiramisuUtils.drawRoundedRect.toString()},
     drawMediaFit: ${TiramisuUtils.drawMediaFit.toString()},
     drawMediaCover: ${TiramisuUtils.drawMediaCover.toString()},
-    drawMasked: ${TiramisuUtils.drawMasked.toString()}
+    drawMasked: ${TiramisuUtils.drawMasked.toString()},
+    
+    // Phase 1: Compositing & Layers
+    createLayer: ${TiramisuUtils.createLayer.toString()},
+    applyFilter: ${TiramisuUtils.applyFilter.toString()},
+    drawLayer: ${TiramisuUtils.drawLayer.toString()}
 };
 `;

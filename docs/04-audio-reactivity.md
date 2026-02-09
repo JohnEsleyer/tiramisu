@@ -1,26 +1,22 @@
-```markdown
 # Audio Reactivity
 
-Tiramisu provides a bridge between Web Audio (browser) and PCM Analysis (server).
+Tiramisu provides 1:1 parity between browser audio previews and final renders.
 
 ## The WASM Analyzer
-To ensure that the frequency bars you see in the browser preview look identical in the final MP4, Tiramisu uses a **Rust-powered Audio Analyzer**. 
+Browsers use the Web Audio API (FFT) for visualizers. To match this on the server, Tiramisu includes a **Rust-powered Audio Analyzer** (`src/rust_audio`) that implements:
+- Blackman Windowing.
+- DC Blocker Filter (to prevent jittery bass bars).
+- Temporal Smoothing.
 
-### Frequency Bands (`audioBands`)
-`audioBands` is an array of 32 normalized values (0.0 to 1.0) representing the frequency spectrum from Bass to Treble.
+### Usage in Clips
 
+#### 1. Frequency Bands (`audioBands`)
+An array of 32 normalized floats (0.0 to 1.0).
 ```typescript
 ({ ctx, audioBands, width, height }) => {
     audioBands.forEach((val, i) => {
-        const h = val * 300;
-        ctx.fillRect(i * 40, height - h, 30, h);
+        const barH = val * 200;
+        ctx.fillRect(i * 20, height - barH, 15, barH);
     });
 }
-```
-
-### Volume (`audioVolume`)
-A single float representing the overall "loudness" (RMS) of the current frame. Useful for pulsing effects or camera shakes.
-```typescript
-const scale = 1 + audioVolume * 0.2;
-ctx.scale(scale, scale);
 ```

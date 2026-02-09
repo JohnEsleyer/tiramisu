@@ -1,38 +1,35 @@
 # Getting Started
 
-Tiramisu is a programmatic video engine that uses a **Unified Canvas API**. This means you write your drawing logic once in TypeScript, preview it in real-time in the browser, and render it to a high-quality MP4 on the server using the exact same code.
+Tiramisu is a programmatic video engine that uses a **Unified Canvas API**. Write your drawing logic once in TypeScript, preview it in real-time in the browser, and render it to a high-quality MP4 on the server.
 
 ## Prerequisites
-- [Bun](https://bun.sh) runtime.
-- **FFmpeg** installed on your system path.
-- **Rust** (optional, for rebuilding the audio analyzer).
+- [Bun](https://bun.sh) (Runtime)
+- **FFmpeg** (Must be in your system PATH)
 
 ## Installation
-```bash
-git clone https://github.com/JohnEsleyer/tiramisu.git
-cd tiramisu
-bun install
 
-# Generate the WASM audio analyzer (Required for audio reactivity)
-bun run build:wasm
-```
+1. **Install Dependencies**:
+   ```bash
+   bun install
+   ```
+   *Note: Tiramisu comes with a pre-compiled Audio Analyzer WASM module, so you do not need Rust or Cargo installed unless you plan to modify the analyzer's core logic.*
 
 ## Your First Render
-On the server, Tiramisu uses Puppeteer to "photograph" your canvas and pipe the buffers into FFmpeg.
+On the server, Tiramisu uses Puppeteer to "photograph" your canvas and pipe the buffers directly into FFmpeg via STDIN.
 
 ```typescript
-import { Tiramisu } from "./src/Tiramisu";
+import { Tiramisu } from "./index";
 
 const engine = new Tiramisu({
     width: 1280,
     height: 720,
     fps: 30,
     durationSeconds: 5,
-    outputFile: "hello-world.mp4"
+    outputFile: "output.mp4"
 });
 
 engine.addClip(0, 5, ({ ctx, width, height, localProgress }) => {
-    ctx.fillStyle = "#1e293b";
+    ctx.fillStyle = "#0f172a";
     ctx.fillRect(0, 0, width, height);
     
     ctx.fillStyle = "white";
@@ -42,5 +39,3 @@ engine.addClip(0, 5, ({ ctx, width, height, localProgress }) => {
 
 await engine.render();
 ```
-
-

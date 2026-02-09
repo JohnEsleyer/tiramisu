@@ -1,13 +1,15 @@
-```markdown
-# Deployment and CLI
+# Deployment and Performance
 
-## Zero-Disk Pipeline
+## Zero-Disk-Waste Pipeline
 Tiramisu is designed for high-performance server environments. 
+- **Streaming**: Instead of saving thousands of PNGs to the disk, Tiramisu captures the Puppeteer screenshot buffer and immediately writes it to the `stdin` of FFmpeg.
+- **Hardware Acceleration**: The `TiramisuEncoder` automatically detects and uses:
+    - `h264_nvenc` (Nvidia)
+    - `h264_videotoolbox` (Apple Silicon/Intel Mac)
+    - `libx264` (Fallback CPU)
 
-1.  **Headless Browser**: Starts a Puppeteer instance.
-2.  **Streaming**: Instead of saving thousands of PNGs to your hard drive, Tiramisu takes the screenshot buffer and immediately writes it to the `stdin` of FFmpeg.
-3.  **Hardware Acceleration**: The `TiramisuEncoder` automatically detects `h264_nvenc` (Nvidia) or `h264_videotoolbox` (Apple Silicon) to speed up encoding.
+## CLI Progress Bar
+When rendering via the `Tiramisu` class, the console provides a live progress bar, frame counts, and a calculated ETA.
 
-## Clean Up
-Tiramisu generates a `.tiramisu-cache` folder to store extracted video frames. You should periodically clear this folder in production to save space, or use it as a persistent cache to speed up subsequent renders of the same source video.
-```
+## Cache Management
+The `.tiramisu-cache` folder stores extracted video frames. You can keep this folder to speed up future renders of the same video or clear it to save disk space.

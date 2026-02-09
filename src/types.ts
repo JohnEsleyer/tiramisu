@@ -9,33 +9,48 @@ export interface RenderConfig<T = any> {
     durationSeconds: number;
     /** Path to the output .mp4 file (Server only) */
     outputFile?: string;
-    
+
     // Optional Fields
-    /** Run Puppeteer in headless mode (default: true) */
     headless?: boolean;
-    /** Path to an audio file for reactivity and encoding */
     audioFile?: string;
-    /** Array of image paths to preload */
     assets?: string[];
-    /** Array of video paths to preload and sync */
     videos?: string[];
-    /** Custom fonts to load via URL */
-    fonts?: { name: string, url: string }[];
-    /** Custom state/data accessible in every draw call */
+    fonts?: { name: string; url: string }[];
     data?: T;
-    /** DOM Canvas Element or ID (Client only) */
     canvas?: HTMLCanvasElement | string;
 }
+
+// --- Phase 1: Compositing & Layers ---
+export interface OffscreenLayer {
+    canvas: HTMLCanvasElement;
+    ctx: CanvasRenderingContext2D;
+    width: number;
+    height: number;
+}
+
+export interface LayerOptions {
+    opacity?: number;
+    blendMode?: GlobalCompositeOperation;
+    filter?: string;
+    x?: number;
+    y?: number;
+}
+// -------------------------------------
+
+export type ProgressPayload = {
+    frame: number;
+    total: number;
+    percent: number;
+    eta: number; // Estimated seconds remaining
+};
 
 export interface RenderContext<T = any> {
     frame: number;
     progress: number;
     localFrame: number;
     localProgress: number;
-    /** Normalized RMS volume (0-1) - from AudioAnalysis on server, or WebAudio on client. */
     audioVolume: number;
-    /** Array of normalized frequency magnitudes (e.g., 32 bins, 0-1) - Client only/placeholder on server. */
-    audioBands: number[]; // <-- NEW FIELD
+    audioBands: number[];
     ctx: CanvasRenderingContext2D;
     canvas: HTMLCanvasElement;
     width: number;
@@ -44,7 +59,7 @@ export interface RenderContext<T = any> {
     data: T;
     assets: Record<string, HTMLImageElement>;
     videos: Record<string, HTMLVideoElement>;
-    utils: typeof import("./Utils").TiramisuUtils;
+    utils: typeof import("./Utils.js").TiramisuUtils;
 }
 
 export type DrawFunction<T = any> = (context: RenderContext<T>) => void;
