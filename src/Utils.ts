@@ -47,7 +47,10 @@ export const TiramisuUtils = {
     drawMediaFit: (ctx: CanvasRenderingContext2D, media: CanvasImageSource, targetW: number, targetH: number) => {
         if (!media) return;
         let sw = 0, sh = 0;
-        if (media instanceof HTMLVideoElement) { sw = media.videoWidth; sh = media.videoHeight; }
+        if (media instanceof ImageBitmap) {
+            sw = media.width;
+            sh = media.height;
+        } else if (media instanceof HTMLVideoElement) { sw = media.videoWidth; sh = media.videoHeight; }
         else if (media instanceof HTMLImageElement) { sw = media.naturalWidth || media.width; sh = media.naturalHeight || media.height; }
         if (sw === 0 || sh === 0) return;
 
@@ -76,7 +79,10 @@ export const TiramisuUtils = {
     drawMediaCover: (ctx: CanvasRenderingContext2D, media: CanvasImageSource, targetW: number, targetH: number) => {
         if (!media) return;
         let sw = 0, sh = 0;
-        if (media instanceof HTMLVideoElement) { sw = media.videoWidth; sh = media.videoHeight; }
+        if (media instanceof ImageBitmap) {
+            sw = media.width;
+            sh = media.height;
+        } else if (media instanceof HTMLVideoElement) { sw = media.videoWidth; sh = media.videoHeight; }
         else if (media instanceof HTMLImageElement) { sw = media.naturalWidth || media.width; sh = media.naturalHeight || media.height; }
         if (sw === 0 || sh === 0) return;
 
