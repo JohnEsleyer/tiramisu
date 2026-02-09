@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiramisu - Compositing Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+            max-width: 1400px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        button, input[type="file"] {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        button:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        input[type="file"] {
+            background: #f0f0f0;
+            color: #333;
+        }
+        input[type="file"]:hover {
+            background: #e0e0e0;
+        }
+        #status {
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 14px;
+        }
+        #canvas-wrapper {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .info-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f4ff;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+        .info-box h3 {
+            color: #667eea;
+            margin-bottom: 8px;
+            font-size: 18px;
+        }
+        .info-box ul {
+            margin-left: 20px;
+            color: #555;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Compositing & Layers Demo</h1>
+        <p class="subtitle">
+            Phase 1 Demo: Upload a video to see variable blur effects applied to the background layer
+            while keeping the text sharp. The blur animates based on progress, showcasing the power
+            of offscreen layer compositing.
+        </p>
+
+        <div class="controls">
+            <input type="file" id="video-input" accept="video/*">
+            <button id="btn-play" disabled>▶ Play Preview</button>
+        </div>
+
+        <div id="status">📹 Upload a video to see compositing in action</div>
+
+        <div id="canvas-wrapper">
+            <canvas id="preview-canvas" width="1280" height="720"></canvas>
+        </div>
+
+        <div class="info-box">
+            <h3>What's Happening?</h3>
+            <ul>
+                <li><strong>Background Layer:</strong> Video drawn to an isolated offscreen canvas</li>
+                <li><strong>Variable Blur:</strong> Blur amount changes based on animation progress (0-20px)</li>
+                <li><strong>Brightness Filter:</strong> Applied alongside blur to darken the background</li>
+                <li><strong>Text Layer:</strong> Sharp text rendered on a separate layer</li>
+                <li><strong>Floating Effect:</strong> Text position animated with sine wave</li>
+                <li><strong>Final Composite:</strong> Layers combined with proper blend modes</li>
+            </ul>
+        </div>
+    </div>
+
+    <script type="module" src="./bundle.js"></script>
+</body>
+</html>

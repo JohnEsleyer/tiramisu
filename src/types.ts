@@ -20,6 +20,23 @@ export interface RenderConfig<T = any> {
     canvas?: HTMLCanvasElement | string;
 }
 
+// --- Phase 1: Compositing & Layers ---
+export interface OffscreenLayer {
+    canvas: HTMLCanvasElement;
+    ctx: CanvasRenderingContext2D;
+    width: number;
+    height: number;
+}
+
+export interface LayerOptions {
+    opacity?: number;
+    blendMode?: GlobalCompositeOperation;
+    filter?: string;
+    x?: number;
+    y?: number;
+}
+// -------------------------------------
+
 export type ProgressPayload = {
     frame: number;
     total: number;
