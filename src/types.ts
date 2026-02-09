@@ -37,6 +37,20 @@ export type ProgressPayload = {
     eta: number; // Estimated seconds remaining
 };
 
+export interface Layer {
+    canvas: HTMLCanvasElement;
+    ctx: CanvasRenderingContext2D;
+    width: number;
+    height: number;
+    clear: () => void;
+    drawTo: (targetCtx: CanvasRenderingContext2D, x?: number, y?: number, dw?: number, dh?: number) => void;
+    applyBlur: (radius: number) => void;
+    applyBrightness: (amount: number) => void;
+    applyContrast: (amount: number) => void;
+    applyTint: (color: string) => void;
+    applyGrayscale: () => void;
+}
+
 export interface RenderContext<T = any> {
     frame: number;
     progress: number;
@@ -53,6 +67,9 @@ export interface RenderContext<T = any> {
     assets: Record<string, HTMLImageElement>;
     videos: Record<string, HTMLVideoElement>;
     utils: typeof import("./Utils.js").TiramisuUtils;
+    layer: {
+        create: (width?: number, height?: number) => Layer;
+    };
 }
 
 export type DrawFunction<T = any> = (context: RenderContext<T>) => void;

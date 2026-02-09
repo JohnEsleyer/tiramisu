@@ -1,5 +1,8 @@
 import puppeteer, { type Browser, type Page } from "puppeteer";
 import { BROWSER_UTILS_CODE } from "./Utils.js";
+import { WEBCODECS_LOGIC } from "./WebCodecsLogic.js";
+import { readFileSync } from "fs";
+import { join } from "path";
 import type { Clip } from "./types.js";
 
 export class TiramisuBrowser {
@@ -27,7 +30,13 @@ export class TiramisuBrowser {
     ) {
         if (!this.page) return;
         await this.page.goto(url);
+        
+        // Inject MP4Box and our logic
+        const mp4boxPath = join(process.cwd(), "node_modules", "mp4box", "dist", "mp4box.all.js");
+        const MP4BOX_SOURCE = readFileSync(mp4boxPath, "utf-8");
+        await this.page.evaluate(MP4BOX_SOURCE);
         await this.page.evaluate(BROWSER_UTILS_CODE);
+        await this.page.evaluate(WEBCODECS_LOGIC);
 
         await this.page.evaluate(
             async (
@@ -62,9 +71,14 @@ export class TiramisuBrowser {
                 }
 
                 win.loadedVideos = {};
-                videoKeyList.forEach((key) => {
-                    win.loadedVideos[key] = new Image();
-                });
+                
+                // Initialize decoders for all videos in memory
+                for (const videoUrl of videoKeyList) {
+                    await (window as any).initVideo(videoUrl);
+                }
+                
+                // Type assertion for videoFrames
+                const videoFrames: Record<string, any> = {};
 
                 win.activeClips = clipList
                     .map((c) => ({
@@ -85,35 +99,14 @@ export class TiramisuBrowser {
                 ) => {
                     const ctx = canvas.getContext("2d")!;
 
-                    // --- CRITICAL CHANGE: ADDING ERROR HANDLER TO IMAGE LOADS ---
-                    await Promise.all(
-                        Object.entries(vMap).map(([key, path]) => {
-                            return new Promise((res) => {
-                                const img = win.loadedVideos[key];
-                                // If src is already correct, resolve immediately
-                                if (img.src.includes(path)) return res(null);
-
-                                const onError = () => {
-                                    console.error(
-                                        `[Puppeteer] FAILED to load frame image: ${path}`,
-                                    );
-                                    img.removeEventListener("load", onLoad);
-                                    res(null); // Resolve to prevent render hang, even on failure
-                                };
-
-                                const onLoad = () => {
-                                    img.removeEventListener("error", onError); // Cleanup
-                                    res(null);
-                                };
-
-                                img.onload = onLoad;
-                                img.onerror = onError;
-
-                                img.src = path;
-                            });
-                        }),
-                    );
-                    // --- END CRITICAL CHANGE ---
+                    // Fetch frames from WebCodecs Decoders instead of <img> tags
+                    const videoFrames: Record<string, any> = {};
+                    for (const [key, path] of Object.entries(vMap)) {
+                        const controller = (window as any).VideoDecoders.get(key);
+                        if (controller) {
+                            videoFrames[key] = await controller.getFrame(frame, fps);
+                        }
+                    }
 
                     ctx.clearRect(0, 0, w, h);
                     for (const clip of win.activeClips) {
@@ -133,8 +126,15 @@ export class TiramisuBrowser {
                                 audioBands: bands,
                                 data: injectedData,
                                 assets: win.loadedAssets,
-                                videos: win.loadedVideos,
+                                videos: videoFrames,
                                 utils: win.TiramisuUtils,
+                                layer: {
+                                    create: (lw?: number, lh?: number) => {
+                                        const layerWidth = lw ?? w;
+                                        const layerHeight = lh ?? h;
+                                        return win.TiramisuUtils.createLayer(layerWidth, layerHeight);
+                                    },
+                                },
                             });
                         }
                     }

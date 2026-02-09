@@ -3,7 +3,6 @@ import { TiramisuBrowser } from "./Browser.js";
 import { TiramisuEncoder } from "./Encoder.js";
 import { TiramisuCLI } from "./CLI.js";
 import { AudioAnalyzer } from "./AudioAnalysis.js";
-import { VideoManager } from "./VideoManager.js";
 import { spawn } from "bun";
 import { unlinkSync, writeFileSync } from "fs";
 import type {
@@ -13,7 +12,6 @@ import type {
     ProgressPayload,
     WorkerPayload,
 } from "./types.js";
-import { join } from "path";
 
 export class Tiramisu<T = any> {
     private config: RenderConfig<T>;
@@ -64,20 +62,9 @@ export class Tiramisu<T = any> {
         const totalFrames = Math.ceil(fps * durationSeconds);
         const startTime = performance.now();
 
-        const videoManager = new VideoManager();
-        const videoFrameMaps: Record<string, { folder: string; count: number }> =
-            {};
-
-        if (this.config.videos) {
-            for (const path of this.config.videos) {
-                const relativePath = path.startsWith("/")
-                    ? path.slice(1)
-                    : path;
-                const fsPath = join(process.cwd(), relativePath);
-                const result = await videoManager.extractFrames(fsPath, fps);
-                videoFrameMaps[path] = result;
-            }
-        }
+        // PHASE 3 CHANGE: No more extraction!
+        // We just verify files exist and pass paths to the browser.
+        const videoPaths = this.config.videos || [];
 
         const server = new TiramisuServer();
         const browser = new TiramisuBrowser();
@@ -103,7 +90,7 @@ export class Tiramisu<T = any> {
             height,
             data || {},
             this.config.assets || [],
-            Object.keys(videoFrameMaps),
+            videoPaths,
             audioAnalysisData,
         );
 
@@ -111,11 +98,7 @@ export class Tiramisu<T = any> {
 
         for (let i = 0; i < totalFrames; i++) {
             const vMap: Record<string, string> = {};
-            for (const [key, info] of Object.entries(videoFrameMaps)) {
-                const idx = (i % info.count) + 1;
-                vMap[key] =
-                    `/${info.folder}/frame_${idx.toString().padStart(5, "0")}.jpg`;
-            }
+            videoPaths.forEach(p => vMap[p] = p);
 
             const { rms, bands } = audioAnalysisData[i] || {
                 rms: 0,
@@ -238,22 +221,18 @@ export class Tiramisu<T = any> {
 
         await Promise.all(workerPromises);
 
-        // --- PHASE 2: FINAL ASSEMBLY ---
         console.log(`\n📦 Stitching ${chunkFiles.length} fragments...`);
 
-        // Sort chunks to ensure correct order
         chunkFiles.sort((a, b) => {
             const numA = parseInt(a.match(/\d+/)![0]);
             const numB = parseInt(b.match(/\d+/)![0]);
             return numA - numB;
         });
 
-        // Create FFmpeg concat list
         const concatListPath = ".tiramisu-concat.txt";
         const listContent = chunkFiles.map((f) => `file '${f}'`).join("\n");
         writeFileSync(concatListPath, listContent);
 
-        // Final FFmpeg command: Concat videos + Add master audio
         const finalArgs = [
             "ffmpeg",
             "-y",
@@ -289,19 +268,10 @@ export class Tiramisu<T = any> {
         const proc = spawn(finalArgs);
         await proc.exited;
 
-        // Cleanup
         chunkFiles.forEach((f) => {
-            try {
-                unlinkSync(f);
-            } catch (e) {
-                // Ignore cleanup errors
-            }
+            try { unlinkSync(f); } catch (e) {}
         });
-        try {
-            unlinkSync(concatListPath);
-        } catch (e) {
-            // Ignore cleanup errors
-        }
+        try { unlinkSync(concatListPath); } catch (e) {}
 
         cli.finish(outputFile!);
     }

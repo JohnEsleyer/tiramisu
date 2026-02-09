@@ -304,7 +304,7 @@ export class TiramisuPlayer<T = any> {
                             (frame - clip.startFrame) /
                             (clip.endFrame - clip.startFrame - 1 || 1),
                         audioVolume: volume,
-                        audioBands: bands, // <-- NEW
+                        audioBands: bands,
                         ctx: this.ctx,
                         canvas: this.canvas,
                         width: this.config.width,
@@ -314,6 +314,13 @@ export class TiramisuPlayer<T = any> {
                         assets: this.loadedAssets,
                         videos: this.loadedVideos,
                         utils: TiramisuUtils,
+                        layer: {
+                            create: (w?: number, h?: number) => {
+                                const width = w ?? this.config.width;
+                                const height = h ?? this.config.height;
+                                return TiramisuUtils.createLayer(width, height) as any;
+                            },
+                        },
                     });
                 }
             }
