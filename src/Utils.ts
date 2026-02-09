@@ -8,15 +8,6 @@ const mulberry32 = (a: number) => {
     }
 }
 
-interface Layer {
-    ctx: CanvasRenderingContext2D;
-    canvas: HTMLCanvasElement;
-    create: (width: number, height: number) => Layer;
-    applyBlur: (amount: number) => void;
-    applyBrightness: (amount: number) => void;
-    drawTo: (targetCtx: CanvasRenderingContext2D) => void;
-}
-
 export const TiramisuUtils = {
     lerp: (start: number, end: number, t: number) => start * (1 - t) + end * t,
     clamp: (val: number, min: number, max: number) => Math.min(Math.max(val, min), max),
@@ -131,31 +122,6 @@ export const TiramisuUtils = {
         ctx.drawImage(buffer, 0, 0);
     },
 
-    /**
-     * Create a new layer for compositing
-     */
-    createLayer: (width: number, height: number): Layer => {
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d')!;
-
-        return {
-            ctx,
-            canvas,
-            create: (w: number, h: number) => TiramisuUtils.createLayer(w, h),
-            applyBlur: (amount: number) => {
-                ctx.filter = `blur(${amount}px)`;
-            },
-            applyBrightness: (amount: number) => {
-                ctx.filter = `brightness(${amount})`;
-            },
-            drawTo: (targetCtx: CanvasRenderingContext2D) => {
-                targetCtx.drawImage(canvas, 0, 0);
-            }
-        };
-    },
-
 };
 
 export const BROWSER_UTILS_CODE = `
@@ -177,7 +143,6 @@ window.TiramisuUtils = {
     drawRoundedRect: ${TiramisuUtils.drawRoundedRect.toString()},
     drawMediaFit: ${TiramisuUtils.drawMediaFit.toString()},
     drawMediaCover: ${TiramisuUtils.drawMediaCover.toString()},
-    drawMasked: ${TiramisuUtils.drawMasked.toString()},
-    createLayer: ${TiramisuUtils.createLayer.toString()}
+    drawMasked: ${TiramisuUtils.drawMasked.toString()}
 };
 `;

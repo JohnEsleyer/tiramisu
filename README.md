@@ -1,256 +1,123 @@
-# Tiramisu Pro - Advanced Video Generation Engine
 
-Tiramisu Pro represents a major evolution of the Tiramisu video generation library, introducing **WebCodecs-based zero-disk processing**, **multi-track interactive editing**, and **AI-powered personalization** capabilities.
+# 🍰 Tiramisu
 
-## 🚀 What's New in Pro
+**Tiramisu** is a high-performance, programmatic video creation engine built on [Bun](https://bun.sh). It bridges the gap between the browser and the server, allowing you to build complex video compositions using the familiar HTML5 Canvas API and render them into high-quality MP4s.
 
-### 1. Zero-Disk WebCodecs Architecture
-- **No more FFmpeg frame extraction**: Videos are processed entirely in memory using WebCodecs API
-- **Lightning-fast rendering**: Up to 10x faster than traditional frame extraction
-- **GPU acceleration**: Automatic hardware encoder detection (NVENC, VideoToolbox)
-- **Infinite scalability**: Process thousands of videos without disk I/O bottlenecks
+Unlike traditional video frameworks, Tiramisu features a **zero-disk-waste pipeline**: Puppeteer screenshots are streamed directly into FFmpeg via STDIN, while a lightweight client-side player provides real-time previews for rapid development.
 
-### 2. Multi-Track Interactive Editor
-- **Real-time timeline editing** with drag-and-drop interface
-- **Photoshop-style layer system** with blend modes and effects
-- **Live preview** with zero-latency scrubbing
-- **Professional compositing** with masking, blur, and brightness filters
+## 🔗 Repository
+[github.com/JohnEsleyer/tiramisu](https://github.com/JohnEsleyer/tiramisu)
 
-### 3. Data-Driven Personalization
-- **Batch generation** of personalized videos from customer data
-- **Dynamic content** based on purchase history, location, and preferences
-- **Loyalty tier integration** with automatic pricing and offers
-- **JSON-driven templates** for scalable content creation
+## ✨ Key Features
 
-### 4. Social Media Optimization
-- **Multi-platform templates** for TikTok, Instagram, YouTube, and Twitter
-- **Automatic aspect ratio conversion** and platform-specific optimization
-- **Viral content patterns** with proven engagement formulas
-- **Audio-reactive effects** for maximum impact
+- **Unified API**: Write your drawing logic once; run it in the browser for live previews and on the server for final rendering.
+- **Audio Reactivity (WASM)**: High-fidelity audio analysis providing real-time RMS volume and frequency bands (FFT) via a Rust-powered WASM module.
+- **Dynamic Asset Pipeline**: Automatic preloading for Images, Fonts (Google/Local), and Videos (synchronized frame-by-frame).
+- **Interactive Preview Player**: Built-in `TiramisuPlayer` for the browser with support for scrubbing, play/pause, and real-time state updates.
+- **Animation Toolbox**: 
+    - **Easings**: Bounce, Cubic, Expo, etc.
+    - **Masking**: Advanced Luma/Stencil masking (video-in-text, shapes).
+    - **Deterministic RNG**: Seeded random generators for consistent particle systems (e.g., snow, rain).
+    - **Layout**: `drawMediaFit` and `drawMediaCover` helpers for responsive media.
 
-## 🏗️ Architecture Overview
+## 🛠 Prerequisites
 
-```
-┌─────────────────────┐    ┌──────────────────────┐    ┌─────────────────────┐
-│   Client Preview    │    │   Server Rendering   │    │   WebCodecs Logic   │
-│                     │    │                      │    │                     │
-│  • Real-time Play   │◄──►│  • Zero-Disk Render  │◄──►│  • MP4 Demuxing     │
-│  • Interactive UI   │    │  • Hardware Encode   │    │  • Video Decoding   │
-│  • Layer Compositing│    │  • Batch Processing  │    │  • Frame Caching    │
-└─────────────────────┘    └──────────────────────┘    └─────────────────────┘
+- **Bun**: The runtime.
+- **FFmpeg**: Required for encoding the final video.
+- **Rust (Optional)**: Only required if you wish to modify/rebuild the audio analyzer WASM.
+
+```bash
+# macOS
+brew install ffmpeg
+# Linux
+sudo apt install ffmpeg
 ```
 
-## 🛠️ Core Upgrades
+## 📦 Installation
 
-### WebCodecs Integration (`src/WebCodecsLogic.ts`)
+1. **Clone and Install:**
+   ```bash
+   git clone https://github.com/JohnEsleyer/tiramisu.git
+   cd tiramisu
+   bun install
+   ```
+
+2. **Build the Audio Analyzer (Required for Visualizers):**
+   ```bash
+   bun run build:wasm
+   ```
+
+3. **Try an Example:**
+   ```bash
+   bun run dev:visualizer  # Music Visualizer
+   bun run dev:meme        # Meme Generator with Drag & Drop
+   bun run dev:snow        # Deterministic Snow Overlay
+   ```
+
+## 🎬 Quick Start
+
+### 1. Unified Drawing Logic
+The core of Tiramisu is the `DrawFunction`. It receives a `context` containing the Canvas 2D API, timing info, and audio data.
+
 ```typescript
-class VideoController {
-    async getFrame(time) {
-        // Direct frame access without disk I/O
-        const sampleIndex = this.samples.findIndex(s => (s.cts / s.timescale) >= time);
-        const sample = this.samples[sampleIndex];
-        
-        // Hardware-accelerated decoding
-        const decoder = new VideoDecoder({
-            output: async (frame) => {
-                const bitmap = await createImageBitmap(frame);
-                this.frameCache.set(sampleIndex, bitmap);
-                frame.close();
-                resolve(bitmap);
-            }
-        });
-    }
-}
-```
-
-### Layer Compositing System
-```typescript
-const layer = utils.createLayer(width, height);
-layer.applyBlur(15);
-layer.applyBrightness(1.2);
-utils.drawMediaCover(layer.ctx, video, width, height);
-layer.drawTo(mainContext);
-```
-
-### Data-Driven Templates
-```typescript
-const renderPersonalizedVideo = ({ data, layer }) => {
-    // Dynamic content based on customer data
-    const discount = data.loyaltyTier === "Gold" ? 0.15 : 0.05;
-    const price = basePrice * (1 - discount);
+const myClip = ({ ctx, width, height, localProgress, audioVolume, utils }) => {
+    // Fill background
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(0, 0, width, height);
     
-    // Location-aware themes
-    const theme = getLocationTheme(data.location);
-    
-    // Purchase history visualization
-    renderPurchaseChart(data.purchaseHistory, layer);
+    // Animate a circle based on audio volume
+    const radius = 50 + (audioVolume * 100);
+    ctx.beginPath();
+    ctx.arc(width/2, height/2, radius, 0, Math.PI * 2);
+    ctx.fillStyle = "#38bdf8";
+    ctx.fill();
 };
 ```
 
-## 📁 Pro Examples
+### 2. Live Preview (Client-Side)
+Ideal for editors and dashboards.
+```typescript
+import { TiramisuPlayer } from "tiramisu/client";
 
-### 1. Interactive Pro Editor (`/examples/pro-editor/`)
-- **Multi-track timeline** with drag-and-drop editing
-- **Real-time property controls** (blur, brightness, position)
-- **Export to MP4** with server-side rendering
-- **Project import/export** for collaboration
+const player = new TiramisuPlayer({
+    width: 1280, height: 720, fps: 60,
+    durationSeconds: 5, canvas: "my-canvas-id"
+});
 
-### 2. Marketing Video Generator (`/examples/marketing-gen/`)
-- **Luma matte effects** (video inside text)
-- **Audio-reactive animations** synchronized to beats
-- **Dynamic ticker animations** and CTA buttons
-- **Professional color grading** and effects
+player.addClip(0, 5, myClip);
+await player.load();
+player.play();
+```
 
-### 3. Data-Driven Personalization (`/examples/data-driven-personalization/`)
-- **Customer segmentation** by loyalty tier
-- **Purchase history visualization** with animated charts
-- **Location-based weather effects** and local events
-- **Batch generation** for 1000+ customers simultaneously
-
-### 4. Social Media Creator (`/examples/social-media-creator/`)
-- **Platform-specific templates** (TikTok 9:16, Instagram 1:1, etc.)
-- **Viral content patterns** with proven formulas
-- **Real-time preview** with platform-specific aspect ratios
-- **Automated hashtags** and engagement optimization
-
-## 🎯 Key Capabilities
-
-### Performance Improvements
-| Feature | Before | Pro | Improvement |
-|---------|--------|-----|-------------|
-| Video Processing | FFmpeg extraction | WebCodecs direct | 10x faster |
-| Memory Usage | High (temp files) | Low (in-memory) | 80% reduction |
-| Batch Processing | Limited by disk I/O | Unlimited scaling | 100x capacity |
-| Seek Performance | Slow (file I/O) | Instant (memory) | Real-time |
-
-### Professional Features
-- **🎨 Layer Compositing**: Unlimited layers with blend modes
-- **🎵 Audio-Reactive**: Visual effects synchronized to music
-- **📊 Data Integration**: JSON-driven content generation
-- **🎬 Professional Effects**: Blur, brightness, masking, transitions
-- **📱 Multi-Platform**: Automatic aspect ratio conversion
-- **⚡ Real-time Preview**: Zero-latency scrubbing and editing
-
-## 🚀 Getting Started
-
-### Basic Usage
+### 3. Final Render (Server-Side)
+Pipes frames to FFmpeg to generate an `.mp4`.
 ```typescript
 import { Tiramisu } from "tiramisu";
 
-// Zero-disk rendering with WebCodecs
-const render = new Tiramisu({
-    width: 1920,
-    height: 1080,
-    fps: 30,
-    durationSeconds: 10,
-    outputFile: "output.mp4",
-    videos: ["/video.mp4"], // Direct MP4 URLs - no extraction!
-    data: customerData
+const engine = new Tiramisu({
+    width: 1280, height: 720, fps: 30,
+    durationSeconds: 5, outputFile: "output.mp4"
 });
 
-render.addClip(0, 10, ({ ctx, width, height, videos, layer, utils }) => {
-    // Professional compositing with layers
-    const bg = layer.create();
-    videos.get("/video.mp4").getFrame(time).then(bitmap => {
-        utils.drawMediaCover(bg.ctx, bitmap, width, height);
-    });
-    bg.applyBlur(10);
-    bg.drawTo(ctx);
-});
-
-await render.render();
+engine.addClip(0, 5, myClip);
+await engine.render();
 ```
 
-### Interactive Editor
-```typescript
-import { TiramisuPlayer } from "tiramisu";
+## 🧠 Architecture
 
-const player = new TiramisuPlayer({
-    width: 1280,
-    height: 720,
-    canvas: "editor-canvas",
-    videos: ["/source.mp4"]
-});
+1.  **The Server (`Tiramisu.ts`)**: Orchestrates the headless browser (Puppeteer) and the encoder (FFmpeg).
+2.  **The Analyzer (`AudioAnalysis.ts`)**: Uses a **Rust/WASM** module to perform FFT and RMS analysis on audio files, mirroring Web Audio API behavior on the server.
+3.  **The Video Manager (`VideoManager.ts`)**: Extracts video frames into a local cache to ensure frame-accurate synchronization during headless rendering.
+4.  **The Utils (`Utils.ts`)**: A shared library injected into both Puppeteer and the Browser Player to ensure math and drawing functions are identical across environments.
+5.  **The Encoder (`Encoder.ts`)**: Automatically detects hardware acceleration (NVENC, VideoToolbox) for faster-than-realtime encoding.
 
-// Real-time editing
-player.addClip(0, 10, renderFunction);
-player.load();
+## 🎨 Creative Examples Included
 
-// Interactive controls
-document.getElementById('render-btn').onclick = async () => {
-    const videoBlob = await renderToMP4(projectData);
-    download(videoBlob);
-};
-```
+- **`luma-matte`**: How to use stencil buffers for "Video inside Text" effects.
+- **`music-visualizer`**: Real-time frequency bar rendering.
+- **`meme-generator`**: A full UI example showing how to sync React/State with the Tiramisu timeline.
+- **`split-screen`**: Dynamic wipe transitions between two video sources.
+- **`snow-overlay`**: Using `seededRandomGenerator` to ensure particle systems look identical in preview and final render.
 
-### Data-Driven Generation
-```typescript
-// Generate 1000 personalized videos
-const customers = await fetchCustomerData();
-const videos = await generateBatchVideos(customers, {
-    template: 'personalized-offer',
-    batchSize: 100,
-    quality: 'high'
-});
-```
-
-## 🔧 Technical Details
-
-### WebCodecs Processing Pipeline
-1. **MP4Box Demuxing**: Parse video container structure
-2. **Hardware Decoding**: Use GPU-accelerated video decoders
-3. **Frame Caching**: Intelligent memory management
-4. **Direct Rendering**: Stream frames to canvas without disk I/O
-
-### Hardware Acceleration
-- **NVIDIA NVENC**: GPU-accelerated H.264/H.265 encoding
-- **Apple VideoToolbox**: Hardware encoding on macOS
-- **Intel Quick Sync**: Hardware encoding support
-- **Automatic Fallback**: Software encoding when hardware unavailable
-
-### Memory Management
-- **Frame Caching**: LRU cache for frequently accessed frames
-- **Zero-Copy Rendering**: Direct memory-to-canvas transfers
-- **Garbage Collection**: Automatic cleanup of video resources
-- **Batch Optimization**: Process multiple videos with minimal overhead
-
-## 🎯 Use Cases
-
-### Marketing Agencies
-- **Personalized ads** for each customer segment
-- **A/B testing** with automated video variants
-- **Social media campaigns** across multiple platforms
-- **Product demonstrations** with dynamic pricing
-
-### E-commerce Platforms
-- **Product showcases** with customer data integration
-- **Loyalty program videos** with tier-specific benefits
-- **Seasonal promotions** with batch generation
-- **Customer journey visualization** from purchase history
-
-### Content Creators
-- **Multi-platform content** with automatic optimization
-- **Viral template library** with proven patterns
-- **Audio-reactive music videos** with beat synchronization
-- **Interactive storytelling** with real-time preview
-
-### Enterprise Applications
-- **Corporate communications** with data integration
-- **Training videos** with personalized content
-- **Data visualization** with animated charts and graphs
-- **Presentation automation** with dynamic content
-
-## 🔮 Future Roadmap
-
-- **🎨 AI-Powered Effects**: Automatic color grading and style transfer
-- **🤖 Smart Templates**: ML-generated video layouts based on content
-- **☁️ Cloud Rendering**: Distributed video processing across multiple servers
-- **📊 Advanced Analytics**: Real-time engagement tracking and optimization
-- **🎮 Interactive Elements**: Clickable hotspots and user interactions
-- **🌐 WebRTC Integration**: Live streaming with real-time effects
-
----
-
-**Tiramisu Pro** transforms video generation from a slow, disk-bound process into a lightning-fast, memory-efficient operation capable of scaling to thousands of personalized videos. The combination of WebCodecs, layer compositing, and data-driven templates makes it the ultimate tool for modern video content creation.
-
-Ready to create professional videos at scale? Start with the [Pro Editor](http://localhost:3000/examples/pro-editor/) or explore our [examples](http://localhost:3000/)!
+## 📝 License
+MIT — Created by John Esleyer.
