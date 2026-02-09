@@ -18,6 +18,16 @@ export interface RenderConfig<T = any> {
     fonts?: { name: string; url: string }[];
     data?: T;
     canvas?: HTMLCanvasElement | string;
+    /** Number of parallel workers. Defaults to CPU core count. */
+    parallel?: number;
+}
+
+export interface WorkerPayload {
+    workerId: number;
+    startFrame: number;
+    endFrame: number;
+    config: RenderConfig;
+    clips: Clip[];
 }
 
 export type ProgressPayload = {
