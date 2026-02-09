@@ -1,522 +1,472 @@
-import { Tiramisu } from "../src/Tiramisu";
-import type { DrawFunction } from "../src/types";
+import { Tiramisu } from "../src/Tiramisu.js";
+import { serve } from "bun";
 
-const PORT = 3000;
-console.log(`🚀 Tiramisu Server starting on http://localhost:${PORT}`);
+// Enhanced server with API endpoints for the new examples
+const server = serve({
+    port: 3000,
+    routes: {
+        // Serve example files
+        "/examples/pro-editor/*": (req) => {
+            const url = new URL(req.url);
+            const filePath = url.pathname.replace("/examples/pro-editor", "/examples/pro-editor");
+            return new Response(Bun.file(`./${filePath}`));
+        },
+        "/examples/marketing-gen/*": (req) => {
+            const url = new URL(req.url);
+            const filePath = url.pathname.replace("/examples/marketing-gen", "/examples/marketing-gen");
+            return new Response(Bun.file(`./${filePath}`));
+        },
+        "/examples/data-driven-personalization/*": (req) => {
+            const url = new URL(req.url);
+            const filePath = url.pathname.replace("/examples/data-driven-personalization", "/examples/data-driven-personalization");
+            return new Response(Bun.file(`./${filePath}`));
+        },
+        "/examples/social-media-creator/*": (req) => {
+            const url = new URL(req.url);
+            const filePath = url.pathname.replace("/examples/social-media-creator", "/examples/social-media-creator");
+            return new Response(Bun.file(`./${filePath}`));
+        },
 
-// ============================================================================
-// SHARED CLIP DEFINITIONS
-// ============================================================================
-
-// --- 1. Music Visualizer Clips ---
-const serverBackgroundClip: DrawFunction = ({ ctx, width, height, videos, data, utils, audioVolume }) => {
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, width, height);
-    if (data.videoPath && videos[data.videoPath]) {
-        const pulseScale = 1.0 + audioVolume * 0.10;
-        ctx.save();
-        ctx.translate(width / 2, height / 2);
-        ctx.scale(pulseScale, pulseScale);
-        ctx.translate(-width / 2, -height / 2);
-        utils.drawMediaFit(ctx, videos[data.videoPath], width, height);
-        ctx.restore();
-    }
-};
-
-const serverFftClip: DrawFunction = ({ ctx, width, height, audioBands, audioVolume, utils }) => {
-    const barCount = audioBands.length; 
-    const barWidth = width / barCount / 1.5;
-    const padding = barWidth / 2;
-    const baseHeight = height * 0.2;
-    const maxBarHeight = height * 0.3;
-    const barColor = (v: number) => `rgba(245, 158, 11, ${utils.clamp(v * 2, 0.2, 1.0)})`;
-
-    ctx.save();
-    ctx.translate(padding, height - padding - 10); 
-    for (let i = 0; i < barCount; i++) {
-        const bandValue = audioBands[i];
-        const h = baseHeight + bandValue * maxBarHeight;
-        const x = i * (barWidth + padding);
-        const y = -h;
-        ctx.fillStyle = barColor(bandValue);
-        utils.drawRoundedRect(ctx, x, y, barWidth, h, 5);
-        ctx.fill();
-    }
-    ctx.restore();
-
-    const circleRadius = 50 + audioVolume * 80;
-    ctx.beginPath();
-    ctx.arc(width - 80, 80, circleRadius, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(245, 158, 11, ${utils.clamp(audioVolume * 2, 0.1, 0.8)})`;
-    ctx.fill();
-};
-
-// --- 2. Split Screen Clips ---
-const serverSplitBase: DrawFunction = ({ ctx, width, height, videos, data }) => {
-    ctx.fillStyle = "#111";
-    ctx.fillRect(0, 0, width, height);
-    if (data.videoA && videos[data.videoA]) {
-        ctx.drawImage(videos[data.videoA], 0, 0, width, height);
-    }
-};
-
-const serverSplitOverlay: DrawFunction = ({ ctx, width, height, videos, data }) => {
-    if (!data.videoB || !videos[data.videoB]) return;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(width * data.wipe, 0, width * (1 - data.wipe), height);
-    ctx.clip();
-    ctx.drawImage(videos[data.videoB], 0, 0, width, height);
-    ctx.restore();
-};
-
-const serverSplitDivider: DrawFunction = ({ ctx, width, height, data }) => {
-    const x = width * data.wipe;
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, height);
-    ctx.stroke();
-    ctx.fillStyle = "white";
-    ctx.beginPath();
-    ctx.arc(x, height / 2, 20, 0, Math.PI * 2);
-    ctx.fill();
-};
-
-// --- 3. Snow Clips ---
-const serverSnowClip: DrawFunction = ({ ctx, width, height, frame, fps, data, utils }) => {
-    const { particleCount, randomSeed, totalDuration, maxParticleSpeed } = data as any;
-    const masterRNG = utils.seededRandomGenerator(randomSeed); 
-    
-    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-    ctx.shadowBlur = 4;
-    ctx.shadowColor = "white";
-    
-    for (let i = 0; i < particleCount; i++) {
-        const particleSeed = randomSeed + i;
-        const pRNG = utils.seededRandomGenerator(particleSeed);
-
-        const startX = pRNG() * width;
-        const startY = pRNG() * height; 
-        const size = utils.lerp(1, 3, pRNG()); 
-        const fallSpeed = utils.lerp(10, maxParticleSpeed, size / 3); 
-        const windAmplitude = utils.lerp(20, 80, pRNG());
-        const windFrequency = utils.lerp(0.5, 1.5, pRNG()); 
-
-        const currentTime = frame / fps;
-        const yTravel = fallSpeed * currentTime;
-        const y = (startY + yTravel) % height;
-
-        const normalizedTime = currentTime / totalDuration; 
-        const xDrift = Math.sin(normalizedTime * Math.PI * 2 * windFrequency) * windAmplitude;
-        const x = startX + xDrift;
-        
-        ctx.beginPath();
-        ctx.arc(x, y, size, 0, Math.PI * 2);
-        ctx.fill();
-    }
-    ctx.shadowBlur = 0;
-};
-
-// --- 4. Mask Clip (Luma Matte) ---
-const serverMaskClip: DrawFunction = ({ ctx, width, height, videos, utils, localProgress }) => {
-    const drawMask = (c: CanvasRenderingContext2D) => {
-        c.fillStyle = "white"; 
-        c.font = "900 180px sans-serif";
-        c.textAlign = "center";
-        c.textBaseline = "middle";
-        const yOffset = Math.sin(localProgress * Math.PI * 2) * 40;
-        c.fillText("TIRAMISU", width / 2, height / 2 + yOffset);
-    };
-
-    const drawContent = (c: CanvasRenderingContext2D) => {
-        if (videos["/flower.mp4"]) {
-            utils.drawMediaCover(c, videos["/flower.mp4"], width, height);
-        }
-    };
-
-    utils.drawMasked(ctx, drawContent, drawMask);
-};
-
-// --- 5. Generic Video Clip (Video Upload + Overlay) ---
-const serverVideoPassClip: DrawFunction = ({ ctx, width, height, videos, data, utils }) => {
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, width, height);
-    if (data.videoPath && videos[data.videoPath]) {
-        utils.drawMediaFit(ctx, videos[data.videoPath], width, height);
-    }
-};
-
-const serverTextOverlayClip: DrawFunction = ({ ctx, width, height, frame, fps, utils, data }) => {
-    if (!data.text) return;
-
-    const currentTime = frame / fps;
-    const entranceDuration = 1.0; 
-    const t = Math.min(currentTime / entranceDuration, 1);
-    const easedT = utils.easeOutCubic(t);
-
-    const safeMarginBottom = height * 0.12; 
-    const cardHeight = 140;
-    const cardWidth = Math.min(width * 0.85, 600); 
-    
-    const x = (width - cardWidth) / 2;
-    const targetY = height - safeMarginBottom - cardHeight;
-    const startY = height + 20;
-    const y = utils.lerp(startY, targetY, easedT);
-
-    // Card Shadow
-    ctx.shadowColor = "rgba(0,0,0,0.4)";
-    ctx.shadowBlur = 30;
-    ctx.shadowOffsetY = 10;
-
-    // Card Body
-    ctx.fillStyle = "white";
-    utils.drawRoundedRect(ctx, x, y, cardWidth, cardHeight, 20);
-    ctx.fill();
-
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Accent Strip
-    if (data.color) {
-        ctx.fillStyle = data.color;
-        ctx.save();
-        ctx.beginPath();
-        // NOTE: Changed from cardWidth to cardHeight in the drawRoundedRect call
-        utils.drawRoundedRect(ctx, x, y, cardWidth, cardHeight, 20); 
-        ctx.clip();
-        ctx.fillRect(x, y, 28, cardHeight);
-        ctx.restore();
-    }
-
-    // Text Content
-    const contentX = x + 45;
-    const centerY = y + (cardHeight / 2);
-
-    ctx.fillStyle = "#0f172a";
-    ctx.font = "800 42px 'Segoe UI', Roboto, sans-serif";
-    ctx.textBaseline = "bottom";
-    ctx.textAlign = "left";
-    ctx.fillText(data.text, contentX, centerY + 5);
-
-    ctx.fillStyle = "#64748b";
-    ctx.font = "600 24px 'Segoe UI', Roboto, sans-serif";
-    ctx.textBaseline = "top";
-    ctx.fillText(`RENDER: ${width}x${height}px`, contentX, centerY + 10);
-};
-
-
-const serverEditorSquareClip: DrawFunction = ({ ctx, width, height, localProgress, utils }) => {
-    // Exact same math as client: Bouncing Sine Wave
-    const y = utils.lerp(100, height - 100, Math.abs(Math.sin(localProgress * Math.PI * 2)));
-    const x = width / 2;
-    
-    ctx.fillStyle = "#f59e0b"; // Orange
-    utils.drawRoundedRect(ctx, x - 50, y - 50, 100, 100, 20);
-    ctx.fill();
-};
-
-const serverEditorTextClip: DrawFunction = ({ ctx, width, height, localProgress, utils }) => {
-    // Exact same math as client: Fade In/Out
-    ctx.globalAlpha = utils.easeInQuad(localProgress < 0.5 ? localProgress * 2 : (1 - localProgress) * 2);
-    ctx.fillStyle = "white";
-    ctx.font = "bold 80px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("LIVE PREVIEW", width / 2, height / 2);
-    ctx.globalAlpha = 1;
-};
-
-// --- NEW: Meme Generator Server Clip ---
-const serverMemeClip: DrawFunction = ({ ctx, width, height, videos, data, utils }) => {
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, width, height);
-    
-    // Draw background video (using fit for letterboxing)
-    if (data.videoPath && videos[data.videoPath]) {
-        utils.drawMediaFit(ctx, videos[data.videoPath], width, height);
-    }
-
-    // Draw Text (Impact style, sans-serif fallback)
-    const drawMemeText = (text: string, x: number, y: number) => {
-        // Matching the client's font logic as closely as possible
-        ctx.font = `bold 60px Impact, sans-serif`; 
-        ctx.textAlign = "center";
-        ctx.fillStyle = "white";
-        ctx.strokeStyle = "black";
-        ctx.lineWidth = 6;
-        // Use the coordinates passed via the 'data' object
-        ctx.strokeText(text.toUpperCase(), x, y);
-        ctx.fillText(text.toUpperCase(), x, y);
-    };
-
-    drawMemeText(data.topText, data.topPos.x, data.topPos.y);
-    drawMemeText(data.bottomText, data.bottomPos.x, data.bottomPos.y);
-};
-
-
-// ============================================================================
-// SERVER DEFINITION
-// ============================================================================
-
-Bun.serve({
-    port: PORT,
-    idleTimeout: 255, 
-
-    async fetch(req) {
-        const url = new URL(req.url);
-
-        // --- NEW: MEME GENERATOR EXPORT ---
-        if (url.pathname === "/api/render-meme" && req.method === "POST") {
-            try {
-                const formData = await req.formData();
-                const videoFile = formData.get("video") as File;
-                // Client sends a JSON string of state
-                const memeData = JSON.parse(formData.get("memeData") as string); 
-                
-                // Write uploaded video to a temp file
-                const videoPath = `meme_in_${Date.now()}.mp4`;
-                await Bun.write(videoPath, await videoFile.arrayBuffer());
-                const outputName = `meme_out_${Date.now()}.mp4`;
-                
-                const engine = new Tiramisu({
-                    width: 1280, height: 720, fps: 30, durationSeconds: 5,
-                    outputFile: outputName,
-                    videos: [`/${videoPath}`],
-                    data: { 
-                        videoPath: `/${videoPath}`, 
-                        ...memeData,
-                        fontSize: 60 // Hardcode size for server consistency
-                    }
-                });
-
-                // The clip uses the coordinates passed in the 'data' object
-                engine.addClip(0, 5, serverMemeClip); 
-                await engine.render();
-                
-                return new Response(Bun.file(outputName));
-            } catch (e) { 
-                console.error(e);
-                return new Response(String(e), { status: 500 }); 
+        // API endpoint for pro-editor rendering
+        "/api/render-pro": async (req) => {
+            if (req.method !== "POST") {
+                return new Response("Method not allowed", { status: 405 });
             }
-        }
-        // --- END NEW: MEME GENERATOR EXPORT ---
-        
-        // VISUALIZER EXPORT
-        if (url.pathname === "/api/render-visualizer" && req.method === "POST") {
+
             try {
-                const formData = await req.formData();
-                const videoFile = formData.get("video") as File;
-                const audioFile = formData.get("audio") as File;
-                const width = parseInt(formData.get("width") as string || "1280");
-                const height = parseInt(formData.get("height") as string || "720");
-                const duration = parseFloat(formData.get("duration") as string || "5");
+                const { project } = await req.json();
 
-                const tempVideoName = `upload_vid_${Date.now()}.mp4`;
-                const tempAudioName = `upload_aud_${Date.now()}.mp3`;
-                await Bun.write(tempVideoName, await videoFile.arrayBuffer());
-                await Bun.write(tempAudioName, await audioFile.arrayBuffer());
-                const outputName = `visualizer_${Date.now()}.mp4`;
+                const renderConfig = {
+                    width: 1280,
+                    height: 720,
+                    fps: 30,
+                    durationSeconds: 10,
+                    outputFile: "pro-editor-output.mp4",
+                    data: project,
+                    videos: project.filter((item: any) => item.type === 'video').map((item: any) => item.content),
+                    assets: [],
+                    headless: true
+                };
 
-                const engine = new Tiramisu({
-                    width, height, fps: 30, durationSeconds: duration,
-                    outputFile: outputName, audioFile: tempAudioName, 
-                    videos: [`/${tempVideoName}`],
-                    data: { videoPath: `/${tempVideoName}` }
+                const tiramisu = new Tiramisu(renderConfig);
+
+                // Add the render function
+                tiramisu.addClip(0, 10, ({ ctx, width, height, frame, fps, data, layer, utils }) => {
+                    const time = frame / fps;
+
+                    data.forEach((item: any) => {
+                        if (time >= item.start && time < (item.start + item.duration)) {
+                            const itemLayer = layer.create(width, height);
+                            
+                            if (item.type === 'video') {
+                                // For server-side, we'd need to handle video differently
+                                // This is a simplified version
+                                utils.drawMediaCover(itemLayer.ctx, null, width, height);
+                            } else if (item.type === 'text') {
+                                itemLayer.ctx.fillStyle = "white";
+                                itemLayer.ctx.font = `bold ${80 * item.scale}px Inter`;
+                                itemLayer.ctx.textAlign = "center";
+                                itemLayer.ctx.fillText(item.content, item.x, item.y);
+                            }
+
+                            if (item.filters.blur > 0) itemLayer.applyBlur(item.filters.blur);
+                            if (item.filters.brightness !== 1) itemLayer.applyBrightness(item.filters.brightness - 1);
+                            
+                            itemLayer.drawTo(ctx);
+                        }
+                    });
                 });
 
-                engine.addClip(0, duration, serverBackgroundClip, 0);
-                engine.addClip(0, duration, serverFftClip, 1);
-                await engine.render();
-                
-                return new Response(Bun.file(outputName));
-            } catch (e) { return new Response(String(e), { status: 500 }); }
-        }
+                await tiramisu.render();
 
-        // SPLIT SCREEN EXPORT
-        if (url.pathname === "/api/export-split" && req.method === "POST") {
-            try {
-                const formData = await req.formData();
-                const vidA = formData.get("videoA") as File;
-                const vidB = formData.get("videoB") as File;
-                const wipe = parseFloat(formData.get("wipe") as string || "0.5");
-                const duration = parseFloat(formData.get("duration") as string || "5");
-                const width = parseInt(formData.get("width") as string || "1280");
-                const height = parseInt(formData.get("height") as string || "720");
-
-                const pathA = `split_a_${Date.now()}.mp4`;
-                const pathB = `split_b_${Date.now()}.mp4`;
-                await Bun.write(pathA, await vidA.arrayBuffer());
-                await Bun.write(pathB, await vidB.arrayBuffer());
-                const outputName = `split_render_${Date.now()}.mp4`;
-
-                const engine = new Tiramisu({
-                    width, height, fps: 30, durationSeconds: duration,
-                    outputFile: outputName,
-                    videos: [`/${pathA}`, `/${pathB}`],
-                    data: { videoA: `/${pathA}`, videoB: `/${pathB}`, wipe }
-                });
-
-                engine.addClip(0, duration, serverSplitBase, 0);
-                engine.addClip(0, duration, serverSplitOverlay, 1);
-                engine.addClip(0, duration, serverSplitDivider, 2);
-
-                await engine.render();
-                return new Response(Bun.file(outputName));
-            } catch (e) { return new Response(String(e), { status: 500 }); }
-        }
-
-        // SNOW EXPORT
-        if (url.pathname === "/api/render-snow" && req.method === "POST") {
-            try {
-                const body = await req.json();
-                const { width, height, fps, duration, particleCount, randomSeed, maxParticleSpeed } = body;
-                const outputName = `snow_${Date.now()}.mp4`;
-
-                const engine = new Tiramisu({
-                    width, height, fps, durationSeconds: duration,
-                    outputFile: outputName,
-                    data: { particleCount, randomSeed, totalDuration: duration, maxParticleSpeed }
-                });
-
-                engine.addClip(0, duration, ({ctx, width, height}) => {
-                    const grad = ctx.createLinearGradient(0, 0, 0, height);
-                    grad.addColorStop(0, "#0e131f");
-                    grad.addColorStop(1, "#1c253c");
-                    ctx.fillStyle = grad;
-                    ctx.fillRect(0, 0, width, height);
-                }, 0);
-
-                engine.addClip(0, duration, serverSnowClip, 1);
-
-                await engine.render();
-                return new Response(Bun.file(outputName));
-            } catch(e) { return new Response(String(e), { status: 500 }); }
-        }
-
-        // LUMA MATTE EXPORT
-        if (url.pathname === "/api/export-mask" && req.method === "POST") {
-            try {
-                const width = 1280;
-                const height = 720;
-                const duration = 10;
-                const outputName = `mask_render_${Date.now()}.mp4`;
-
-                const engine = new Tiramisu({
-                    width, height, fps: 30, durationSeconds: duration,
-                    outputFile: outputName,
-                    videos: ["/flower.mp4"] 
-                });
-
-                engine.addClip(0, duration, ({ctx, w, h}: any) => {
-                    ctx.fillStyle = "#0f172a";
-                    ctx.fillRect(0,0,width,height);
-                }, 0);
-
-                engine.addClip(0, duration, serverMaskClip, 1);
-
-                await engine.render();
-                return new Response(Bun.file(outputName));
-            } catch(e) { return new Response(String(e), { status: 500 }); }
-        }
-
-        // ====================================================================
-        // GENERIC EXPORT (Handles Video Upload & Video Editor)
-        // ====================================================================
-        if (url.pathname === "/api/export" && req.method === "POST") {
-            try {
-                let width = 1280, height = 720, duration = 5;
-                let text: string | null = null;
-                let color: string | null = null;
-                let videoPath: string | undefined;
-                let audioPath: string | undefined;
-                let isEditor = false;
-
-                const contentType = req.headers.get("content-type") || "";
-
-                if (contentType.includes("application/json")) {
-                    isEditor = true;
-                    const body = await req.json();
-                    if (body.resolution) {
-                        const [w, h] = body.resolution.split("x").map(Number);
-                        width = w; height = h;
+                // Return the rendered video
+                const videoFile = Bun.file("pro-editor-output.mp4");
+                return new Response(videoFile, {
+                    headers: {
+                        "Content-Type": "video/mp4",
+                        "Content-Disposition": "attachment; filename=pro-editor-output.mp4"
                     }
-                    if (body.duration) duration = parseFloat(body.duration);
-                } else {
-                    const formData = await req.formData();
-                    const videoFile = formData.get("video") as File;
-                    width = parseInt(formData.get("width") as string || "1280");
-                    height = parseInt(formData.get("height") as string || "720");
-                    duration = parseFloat(formData.get("duration") as string || "5");
-                    text = formData.get("text") as string | null;
-                    color = formData.get("color") as string | null;
-
-                    if (videoFile && videoFile.size > 0) {
-                        const fname = `upload_gen_${Date.now()}.mp4`;
-                        await Bun.write(fname, await videoFile.arrayBuffer());
-                        videoPath = `/${fname}`;
-                        audioPath = fname; 
-                    }
-                }
-
-                const outputName = `export_${Date.now()}.mp4`;
-                const engine = new Tiramisu({
-                    width, height, fps: 30, durationSeconds: duration,
-                    outputFile: outputName,
-                    videos: videoPath ? [videoPath] : [],
-                    audioFile: audioPath,
-                    data: { videoPath, text, color }
                 });
 
-                // --- LOGIC BRANCHING ---
+            } catch (error) {
+                console.error("Render error:", error);
+                return new Response(JSON.stringify({ error: "Failed to render video" }), {
+                    status: 500,
+                    headers: { "Content-Type": "application/json" }
+                });
+            }
+        },
 
-                if (isEditor) {
-                    // 1. Editor Background
-                    engine.addClip(0, duration, ({ ctx, width, height }) => {
-                        const grad = ctx.createLinearGradient(0, 0, width, height);
-                        grad.addColorStop(0, "#2c3e50");
-                        grad.addColorStop(1, "#000000");
-                        ctx.fillStyle = grad;
-                        ctx.fillRect(0, 0, width, height);
-                    }, 0);
+        // API endpoint for marketing generator
+        "/api/render-marketing": async (req) => {
+            if (req.method !== "POST") {
+                return new Response("Method not allowed", { status: 405 });
+            }
 
-                    // 2. Editor Bouncing Square (Layer 1)
-                    engine.addClip(0, duration, serverEditorSquareClip, 1);
+            try {
+                const { template, duration, customText } = await req.json();
 
-                    // 3. Editor Text (Layer 2, 1s to 4s)
-                    engine.addClip(1, 3, serverEditorTextClip, 2);
+                const renderConfig = {
+                    width: 1280,
+                    height: 720,
+                    fps: 30,
+                    durationSeconds: duration || 5,
+                    outputFile: "marketing-output.mp4",
+                    data: { template, customText },
+                    videos: ['/bg.mp4', '/product.mp4'],
+                    assets: [],
+                    headless: true
+                };
 
-                } else {
-                    // Standard Video/Audio Overlay Logic
-                    if (videoPath) {
-                        engine.addClip(0, duration, serverVideoPassClip, 0);
+                const tiramisu = new Tiramisu(renderConfig);
+
+                tiramisu.addClip(0, duration || 5, ({ ctx, width, height, localProgress, layer, videos, utils }) => {
+                    // Background with blur
+                    const bg = layer.create();
+                    utils.drawMediaCover(bg.ctx, null, width, height);
+                    bg.applyBlur(15);
+                    bg.drawTo(ctx);
+
+                    // Masked content (simplified)
+                    const drawText = (c: CanvasRenderingContext2D) => {
+                        c.font = "900 200px Montserrat";
+                        c.textAlign = "center";
+                        c.fillStyle = "white";
+                        c.fillText(customText || "SALE", width/2, height/2);
+                    };
+                    
+                    const drawProduct = (c: CanvasRenderingContext2D) => {
+                        utils.drawMediaFit(c, null, width, height);
+                    };
+
+                    utils.drawMasked(ctx, drawProduct, drawText);
+                    
+                    // Ticker text
+                    ctx.fillStyle = "rgba(255, 0, 0, 0.8)";
+                    const tickerX = (localProgress * -2000) % width;
+                    ctx.font = "40px Monospace";
+                    ctx.fillText("50% OFF - LIMITED TIME - 50% OFF - LIMITED TIME", tickerX, 700);
+                });
+
+                await tiramisu.render();
+
+                const videoFile = Bun.file("marketing-output.mp4");
+                return new Response(videoFile, {
+                    headers: {
+                        "Content-Type": "video/mp4",
+                        "Content-Disposition": "attachment; filename=marketing-output.mp4"
+                    }
+                });
+
+            } catch (error) {
+                console.error("Marketing render error:", error);
+                return new Response(JSON.stringify({ error: "Failed to render marketing video" }), {
+                    status: 500,
+                    headers: { "Content-Type": "application/json" }
+                });
+            }
+        },
+
+        // API endpoint for data-driven personalization
+        "/api/render-personalized": async (req) => {
+            if (req.method !== "POST") {
+                return new Response("Method not allowed", { status: 405 });
+            }
+
+            try {
+                const { customerId, customerData } = await req.json();
+
+                const renderConfig = {
+                    width: 1920,
+                    height: 1080,
+                    fps: 60,
+                    durationSeconds: 15,
+                    outputFile: `personalized-${customerId}.mp4`,
+                    data: customerData,
+                    videos: ['/template.mp4'],
+                    assets: [],
+                    headless: true
+                };
+
+                const tiramisu = new Tiramisu(renderConfig);
+
+                tiramisu.addClip(0, 15, ({ ctx, width, height, data, layer }) => {
+                    // Personalized background based on loyalty tier
+                    const gradient = ctx.createLinearGradient(0, 0, width, height);
+                    if (data.loyaltyTier === "Gold") {
+                        gradient.addColorStop(0, "#FFD700");
+                        gradient.addColorStop(1, "#FFA500");
+                    } else if (data.loyaltyTier === "Silver") {
+                        gradient.addColorStop(0, "#C0C0C0");
+                        gradient.addColorStop(1, "#808080");
                     } else {
-                        engine.addClip(0, duration, ({ctx, width, height}) => {
-                            ctx.fillStyle = "#111"; ctx.fillRect(0,0,width,height);
-                        }, 0);
+                        gradient.addColorStop(0, "#4CAF50");
+                        gradient.addColorStop(1, "#45a049");
                     }
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, width, height);
+                    
+                    // Personalized text
+                    ctx.fillStyle = "#1a1a1a";
+                    ctx.font = "bold 72px Arial";
+                    ctx.textAlign = "center";
+                    ctx.fillText(`Welcome back, ${data.name}!`, width/2, 100);
+                    
+                    // Dynamic pricing
+                    const basePrice = 199;
+                    const discount = data.loyaltyTier === "Gold" ? 0.15 : data.loyaltyTier === "Silver" ? 0.10 : 0.05;
+                    const finalPrice = Math.round(basePrice * (1 - discount));
+                    
+                    ctx.fillStyle = "#ff4444";
+                    ctx.font = "bold 48px Arial";
+                    ctx.fillText(`Special Price: $${finalPrice} (${Math.round(discount * 100)}% off)`, width/2, height - 20);
+                });
 
-                    if (text) {
-                        engine.addClip(0, duration, serverTextOverlayClip, 1);
+                await tiramisu.render();
+
+                const videoFile = Bun.file(`personalized-${customerId}.mp4`);
+                return new Response(videoFile, {
+                    headers: {
+                        "Content-Type": "video/mp4",
+                        "Content-Disposition": `attachment; filename=personalized-${customerId}.mp4`
                     }
+                });
+
+            } catch (error) {
+                console.error("Personalized render error:", error);
+                return new Response(JSON.stringify({ error: "Failed to render personalized video" }), {
+                    status: 500,
+                    headers: { "Content-Type": "application/json" }
+                });
+            }
+        },
+
+        // API endpoint for social media creator
+        "/api/render-social": async (req) => {
+            if (req.method !== "POST") {
+                return new Response("Method not allowed", { status: 405 });
+            }
+
+            try {
+                const { template, format, quality } = await req.json();
+
+                // Determine dimensions based on template
+                let width = 1920, height = 1080;
+                switch (template) {
+                    case 'tiktok':
+                        width = 1080; height = 1920;
+                        break;
+                    case 'instagram':
+                        width = 1080; height = 1080;
+                        break;
+                    case 'youtube':
+                        width = 1920; height = 1080;
+                        break;
+                    case 'twitter':
+                        width = 1200; height = 675;
+                        break;
                 }
 
-                await engine.render();
-                return new Response(Bun.file(outputName));
-            } catch(e) { 
-                console.error(e);
-                return new Response(String(e), { status: 500 }); 
-            }
-        }
-        
-        // STATIC FILES
-        let filePath = "." + url.pathname;
-        if (filePath.endsWith("/")) filePath += "index.html";
-        const file = Bun.file(filePath);
-        if (await file.exists()) return new Response(file);
+                const renderConfig = {
+                    width,
+                    height,
+                    fps: 30,
+                    durationSeconds: template === 'youtube' ? 5 : 15,
+                    outputFile: `social-${template}.mp4`,
+                    data: { template, quality },
+                    videos: ['/content.mp4'],
+                    assets: [],
+                    headless: true
+                };
 
-        return new Response("Not Found", { status: 404 });
+                const tiramisu = new Tiramisu(renderConfig);
+
+                tiramisu.addClip(0, renderConfig.durationSeconds, ({ ctx, width, height, localProgress, data }) => {
+                    // Platform-specific styling
+                    if (data.template === 'tiktok') {
+                        // TikTok-style gradient background
+                        const gradient = ctx.createLinearGradient(0, 0, width, height);
+                        gradient.addColorStop(0, "#ff0050");
+                        gradient.addColorStop(1, "#00f2ea");
+                        ctx.fillStyle = gradient;
+                        ctx.fillRect(0, 0, width, height);
+                        
+                        // Bold text
+                        ctx.fillStyle = "yellow";
+                        ctx.font = "bold 120px Arial";
+                        ctx.textAlign = "center";
+                        ctx.fillText("VIRAL CONTENT", width/2, height/2);
+                        
+                    } else if (data.template === 'instagram') {
+                        // Instagram gradient
+                        ctx.fillStyle = "#405DE6";
+                        ctx.fillRect(0, 0, width, height);
+                        
+                        ctx.fillStyle = "white";
+                        ctx.font = "bold 72px Arial";
+                        ctx.textAlign = "center";
+                        ctx.fillText("@yourstory", width/2, height/2);
+                        
+                    } else if (data.template === 'youtube') {
+                        // YouTube thumbnail style
+                        ctx.fillStyle = "#FF0000";
+                        ctx.fillRect(0, 0, width, height);
+                        
+                        ctx.fillStyle = "yellow";
+                        ctx.font = "900 120px Arial";
+                        ctx.textAlign = "center";
+                        ctx.strokeStyle = "black";
+                        ctx.lineWidth = 8;
+                        ctx.strokeText("INCREDIBLE!", width/2, height/2);
+                        ctx.fillText("INCREDIBLE!", width/2, height/2);
+                    }
+                });
+
+                await tiramisu.render();
+
+                const videoFile = Bun.file(`social-${template}.mp4`);
+                return new Response(videoFile, {
+                    headers: {
+                        "Content-Type": "video/mp4",
+                        "Content-Disposition": `attachment; filename=social-${template}.mp4`
+                    }
+                });
+
+            } catch (error) {
+                console.error("Social render error:", error);
+                return new Response(JSON.stringify({ error: "Failed to render social media video" }), {
+                    status: 500,
+                    headers: { "Content-Type": "application/json" }
+                });
+            }
+        },
+
+        // Serve static files and assets
+        "/": (req) => {
+            return new Response(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiramisu Pro Examples</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 2rem;
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+        .example-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: transform 0.3s ease;
+        }
+        .example-card:hover {
+            transform: translateY(-10px);
+        }
+        .example-card h3 {
+            color: #FFD700;
+            margin-bottom: 1rem;
+        }
+        .example-card a {
+            display: inline-block;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            text-decoration: none;
+            padding: 1rem 2rem;
+            border-radius: 25px;
+            font-weight: 600;
+            margin-top: 1rem;
+            transition: all 0.3s ease;
+        }
+        .example-card a:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Tiramisu Pro Examples</h1>
+        <p>Advanced video generation examples showcasing WebCodecs, interactive editing, and data-driven personalization</p>
+        
+        <div class="examples-grid">
+            <div class="example-card">
+                <h3>🎭 Pro Editor</h3>
+                <p>Interactive timeline editor with drag-and-drop capabilities, real-time preview, and multi-track compositing.</p>
+                <a href="/examples/pro-editor/">Try Pro Editor</a>
+            </div>
+            
+            <div class="example-card">
+                <h3>📈 Marketing Generator</h3>
+                <p>Create viral marketing videos with dynamic masking, audio-reactive elements, and professional effects.</p>
+                <a href="/examples/marketing-gen/">Try Marketing Generator</a>
+            </div>
+            
+            <div class="example-card">
+                <h3>👤 Data-Driven Personalization</h3>
+                <p>Generate thousands of personalized videos using customer data, loyalty tiers, and purchase history.</p>
+                <a href="/examples/data-driven-personalization/">Try Personalization</a>
+            </div>
+            
+            <div class="example-card">
+                <h3>📱 Social Media Creator</h3>
+                <p>Multi-platform content generator for TikTok, Instagram, YouTube, and Twitter with platform-specific optimization.</p>
+                <a href="/examples/social-media-creator/">Try Social Creator</a>
+            </div>
+        </div>
+        
+        <div style="margin-top: 3rem; padding: 2rem; background: rgba(255,255,255,0.1); border-radius: 15px;">
+            <h3>🚀 Key Features</h3>
+            <ul style="text-align: left; max-width: 600px; margin: 0 auto;">
+                <li>⚡ <strong>Zero-Disk WebCodecs:</strong> Lightning-fast video processing without temporary files</li>
+                <li>🎨 <strong>Layer Compositing:</strong> Photoshop-style layer system with blend modes and effects</li>
+                <li>📊 <strong>Data-Driven:</strong> Generate personalized content from JSON data sources</li>
+                <li>🎵 <strong>Audio-Reactive:</strong> Visuals that sync with music beats and audio analysis</li>
+                <li>🌐 <strong>Multi-Platform:</strong> Optimized output for all social media platforms</li>
+                <li>🔄 <strong>Batch Processing:</strong> Generate hundreds of videos simultaneously</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
+            `, {
+                headers: { "Content-Type": "text/html" }
+            });
+        }
     }
 });
+
+console.log("🎬 Tiramisu Pro Server running on http://localhost:3000");
+console.log("📁 Available examples:");
+console.log("  - Pro Editor: http://localhost:3000/examples/pro-editor/");
+console.log("  - Marketing Generator: http://localhost:3000/examples/marketing-gen/");
+console.log("  - Data-Driven Personalization: http://localhost:3000/examples/data-driven-personalization/");
+console.log("  - Social Media Creator: http://localhost:3000/examples/social-media-creator/");
+
+export default server;

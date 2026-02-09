@@ -1,5 +1,6 @@
 import puppeteer, { type Browser, type Page } from "puppeteer";
 import { BROWSER_UTILS_CODE } from "./Utils.js";
+import { WEBCODECS_LOGIC } from "./WebCodecsLogic.js";
 import type { Clip } from "./types.js";
 
 export class TiramisuBrowser {
@@ -22,11 +23,15 @@ export class TiramisuBrowser {
         height: number,
         data: any,
         assets: string[],
-        videoKeys: string[],
-        audioLevels: { rms: number }[], // <-- Audio levels is now an object array
+        videoUrls: string[],
+        audioLevels: { rms: number }[],
     ) {
         if (!this.page) return;
         await this.page.goto(url);
+        
+        // Inject MP4Box library for WebCodecs
+        await this.page.addScriptTag({ url: 'https://unpkg.com/mp4box@0.5.5/dist/mp4box.all.min.js' });
+        await this.page.evaluate(WEBCODECS_LOGIC);
         await this.page.evaluate(BROWSER_UTILS_CODE);
 
         await this.page.evaluate(
@@ -36,7 +41,7 @@ export class TiramisuBrowser {
                 h,
                 injectedData,
                 assetList,
-                videoKeyList,
+                videoUrlList,
                 levels,
             ) => {
                 const win = window as any;
@@ -61,10 +66,14 @@ export class TiramisuBrowser {
                     win.loadedAssets[src] = img;
                 }
 
-                win.loadedVideos = {};
-                videoKeyList.forEach((key) => {
-                    win.loadedVideos[key] = new Image();
-                });
+                // Initialize WebCodecs video controllers
+                for (const videoUrl of videoUrlList) {
+                    if (!win.VideoControllers.has(videoUrl)) {
+                        const controller = new win.VideoController(videoUrl);
+                        await controller.init();
+                        win.VideoControllers.set(videoUrl, controller);
+                    }
+                }
 
                 win.activeClips = clipList
                     .map((c) => ({
@@ -84,36 +93,32 @@ export class TiramisuBrowser {
                     bands: number[],
                 ) => {
                     const ctx = canvas.getContext("2d")!;
+                    const time = frame / fps;
 
-                    // --- CRITICAL CHANGE: ADDING ERROR HANDLER TO IMAGE LOADS ---
-                    await Promise.all(
-                        Object.entries(vMap).map(([key, path]) => {
-                            return new Promise((res) => {
-                                const img = win.loadedVideos[key];
-                                // If src is already correct, resolve immediately
-                                if (img.src.includes(path)) return res(null);
-
-                                const onError = () => {
-                                    console.error(
-                                        `[Puppeteer] FAILED to load frame image: ${path}`,
-                                    );
-                                    img.removeEventListener("load", onLoad);
-                                    res(null); // Resolve to prevent render hang, even on failure
-                                };
-
-                                const onLoad = () => {
-                                    img.removeEventListener("error", onError); // Cleanup
-                                    res(null);
-                                };
-
-                                img.onload = onLoad;
-                                img.onerror = onError;
-
-                                img.src = path;
-                            });
-                        }),
-                    );
-                    // --- END CRITICAL CHANGE ---
+                    // Create layer utility for compositing (matches Client.ts)
+                    const layer = {
+                        create: (width: number, height: number) => {
+                            const layerCanvas = document.createElement('canvas');
+                            layerCanvas.width = width;
+                            layerCanvas.height = height;
+                            const layerCtx = layerCanvas.getContext('2d')!;
+                            
+                            return {
+                                ctx: layerCtx,
+                                canvas: layerCanvas,
+                                create: (w: number, h: number) => layer.create(w, h),
+                                applyBlur: (amount: number) => {
+                                    layerCtx.filter = `blur(${amount}px)`;
+                                },
+                                applyBrightness: (amount: number) => {
+                                    layerCtx.filter = `brightness(${amount})`;
+                                },
+                                drawTo: (targetCtx: CanvasRenderingContext2D) => {
+                                    targetCtx.drawImage(layerCanvas, 0, 0);
+                                }
+                            };
+                        }
+                    };
 
                     ctx.clearRect(0, 0, w, h);
                     for (const clip of win.activeClips) {
@@ -133,8 +138,9 @@ export class TiramisuBrowser {
                                 audioBands: bands,
                                 data: injectedData,
                                 assets: win.loadedAssets,
-                                videos: win.loadedVideos,
+                                videos: win.VideoControllers, // Pass WebCodecs controllers
                                 utils: win.TiramisuUtils,
+                                layer: layer,
                             });
                         }
                     }
@@ -145,7 +151,7 @@ export class TiramisuBrowser {
             height,
             data,
             assets,
-            videoKeys,
+            videoUrls,
             audioLevels,
         );
     }

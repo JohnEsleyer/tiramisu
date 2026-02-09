@@ -3,14 +3,12 @@ import { TiramisuBrowser } from "./Browser.js";
 import { TiramisuEncoder } from "./Encoder.js";
 import { TiramisuCLI } from "./CLI.js";
 import { AudioAnalyzer } from "./AudioAnalysis.js";
-import { VideoManager } from "./VideoManager.js";
 import type {
     RenderConfig,
     DrawFunction,
     Clip,
     ProgressPayload,
 } from "./types.js";
-import { join } from "path";
 
 export class Tiramisu<T = any> {
     private config: RenderConfig<T>;
@@ -49,23 +47,6 @@ export class Tiramisu<T = any> {
         const totalFrames = Math.ceil(fps * durationSeconds);
         const startTime = performance.now();
 
-        const videoManager = new VideoManager();
-        const videoFrameMaps: Record<
-            string,
-            { folder: string; count: number }
-        > = {};
-
-        if (this.config.videos) {
-            for (const path of this.config.videos) {
-                const relativePath = path.startsWith("/")
-                    ? path.slice(1)
-                    : path;
-                const fsPath = join(process.cwd(), relativePath);
-                const result = await videoManager.extractFrames(fsPath, fps);
-                videoFrameMaps[path] = result;
-            }
-        }
-
         const server = new TiramisuServer();
         const browser = new TiramisuBrowser();
         const encoder = new TiramisuEncoder(
@@ -83,6 +64,7 @@ export class Tiramisu<T = any> {
         const url = server.start();
         await browser.init(width, height, headless ?? true);
 
+        // Pass original MP4 URLs directly to Puppeteer
         await browser.setupScene(
             url,
             this.clips,
@@ -90,20 +72,13 @@ export class Tiramisu<T = any> {
             height,
             data || {},
             this.config.assets || [],
-            Object.keys(videoFrameMaps),
+            this.config.videos || [],
             audioAnalysisData,
         );
 
         cli.start();
 
         for (let i = 0; i < totalFrames; i++) {
-            const vMap: Record<string, string> = {};
-            for (const [key, info] of Object.entries(videoFrameMaps)) {
-                const idx = (i % info.count) + 1;
-                vMap[key] =
-                    `/${info.folder}/frame_${idx.toString().padStart(5, "0")}.jpg`;
-            }
-
             const { rms, bands } = audioAnalysisData[i] || {
                 rms: 0,
                 bands: Array(32).fill(0),
@@ -113,7 +88,7 @@ export class Tiramisu<T = any> {
                 i,
                 fps,
                 totalFrames,
-                vMap,
+                {}, // No video frame mapping - using WebCodecs directly
                 rms,
                 bands,
             );

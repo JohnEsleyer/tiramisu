@@ -27,6 +27,13 @@ export type ProgressPayload = {
     eta: number; // Estimated seconds remaining
 };
 
+export interface Layer {
+    create: (width: number, height: number) => Layer;
+    applyBlur: (amount: number) => void;
+    applyBrightness: (amount: number) => void;
+    drawTo: (targetCtx: CanvasRenderingContext2D) => void;
+}
+
 export interface RenderContext<T = any> {
     frame: number;
     progress: number;
@@ -41,8 +48,11 @@ export interface RenderContext<T = any> {
     fps: number;
     data: T;
     assets: Record<string, HTMLImageElement>;
-    videos: Record<string, HTMLVideoElement>;
+    videos: Record<string, HTMLVideoElement> | Map<string, any>; // Support both HTMLVideoElement and WebCodecs controllers
     utils: typeof import("./Utils.js").TiramisuUtils;
+    layer: {
+        create: (width: number, height: number) => Layer;
+    };
 }
 
 export type DrawFunction<T = any> = (context: RenderContext<T>) => void;

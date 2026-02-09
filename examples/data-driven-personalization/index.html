@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data-Driven Personalization</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            margin: 0;
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin: 1rem 0;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .canvas-section {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+        
+        #personalization-canvas {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(45deg, #2196F3, #1976D2);
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+        }
+        
+        .btn-secondary:hover {
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+        }
+        
+        .btn-danger:hover {
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
+        }
+        
+        .customer-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .info-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 2rem;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .info-card h3 {
+            margin-top: 0;
+            color: #FFD700;
+            font-size: 1.5rem;
+        }
+        
+        .info-item {
+            margin: 1rem 0;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #FFD700;
+            display: inline-block;
+            width: 120px;
+        }
+        
+        .loyalty-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        .loyalty-gold {
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            color: #1a1a1a;
+        }
+        
+        .loyalty-silver {
+            background: linear-gradient(45deg, #C0C0C0, #808080);
+            color: #1a1a1a;
+        }
+        
+        .loyalty-bronze {
+            background: linear-gradient(45deg, #CD7F32, #8B4513);
+            color: white;
+        }
+        
+        .batch-section {
+            background: rgba(255,215,0,0.1);
+            border: 2px solid rgba(255,215,0,0.3);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .batch-section h3 {
+            color: #FFD700;
+            margin-top: 0;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+        
+        .stat {
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #FFD700;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .progress-bar {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            height: 8px;
+            margin: 1rem 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
+        }
+        
+        .generating {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎬 Data-Driven Personalization</h1>
+        <p>Generate thousands of personalized videos using customer data and AI-powered content</p>
+        
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-number" id="customer-count">1</div>
+                <div class="stat-label">Customer Profile</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">15s</div>
+                <div class="stat-label">Video Duration</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">1080p</div>
+                <div class="stat-label">Resolution</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="canvas-section">
+            <h2>Personalized Video Preview</h2>
+            <canvas id="personalization-canvas" width="1920" height="1080"></canvas>
+            
+            <div class="controls">
+                <button class="btn" id="play-btn">▶ Play Preview</button>
+                <button class="btn btn-secondary" id="render-btn">🎬 Render Single Video</button>
+                <button class="btn btn-danger" id="batch-render-btn">🚀 Generate Batch (1000 videos)</button>
+            </div>
+            
+            <div class="progress-bar" id="batch-progress" style="display: none;">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <p id="batch-status" style="display: none;"></p>
+        </div>
+        
+        <div class="customer-info">
+            <div class="info-card">
+                <h3>👤 Customer Profile</h3>
+                <div class="info-item">
+                    <span class="info-label">Name:</span>
+                    <span id="customer-name">Sarah Johnson</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Location:</span>
+                    <span id="customer-location">San Francisco, CA</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Loyalty Tier:</span>
+                    <span class="loyalty-badge loyalty-gold" id="customer-tier">Gold</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Interests:</span>
+                    <span id="customer-interests">Music, Fitness, Technology</span>
+                </div>
+            </div>
+            
+            <div class="info-card">
+                <h3>📊 Purchase History</h3>
+                <div id="purchase-history">
+                    <div class="info-item">
+                        <span>Smart Watch - $299 (Jan 2024)</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Laptop Stand - $89 (Feb 2024)</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Wireless Headphones - $199 (Mar 2024)</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-card">
+                <h3>🎯 Recommendations</h3>
+                <div class="info-item">
+                    <span class="info-label">Favorite Product:</span>
+                    <span>Wireless Headphones</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Recommended:</span>
+                    <span>Premium Audio Package</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Special Offer:</span>
+                    <span>15% Gold Member Discount</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="batch-section">
+            <h3>🚀 Batch Generation Capabilities</h3>
+            <p>Generate personalized videos for thousands of customers simultaneously using our WebCodecs-powered rendering engine.</p>
+            
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">1000+</div>
+                    <div class="stat-label">Videos/Hour</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">Zero</div>
+                    <div class="stat-label">Disk Usage</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">GPU</div>
+                    <div class="stat-label">Accelerated</div>
+                </div>
+            </div>
+            
+            <ul style="text-align: left; max-width: 600px; margin: 0 auto;">
+                <li>🎭 Dynamic content based on purchase history</li>
+                <li>📍 Location-aware weather and local events</li>
+                <li>🏆 Tier-based pricing and special offers</li>
+                <li>🎨 Personalized color schemes and themes</li>
+                <li>⚡ Real-time data integration</li>
+                <li>📱 Mobile-optimized exports</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script type="module" src="./app.ts"></script>
+</body>
+</html>

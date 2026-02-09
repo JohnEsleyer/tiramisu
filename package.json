@@ -1,7 +1,7 @@
 {
-    "name": "tiramisu",
-    "version": "1.0.1",
-    "description": "Programmatic video creation engine using Canvas API and FFmpeg",
+    "name": "tiramisu-pro",
+    "version": "2.0.0",
+    "description": "Advanced video creation engine with WebCodecs, interactive editing, and AI-powered personalization",
     "type": "module",
     "main": "./index.ts",
     "types": "./index.ts",
@@ -27,8 +27,26 @@
     "scripts": {
         "clean": "rm -rf dist",
         "build:wasm": "cd src/rust_audio && cargo build --target wasm32-unknown-unknown --release && cd ../.. && wasm-bindgen src/rust_audio/target/wasm32-unknown-unknown/release/tiramisu_audio_analyzer.wasm --out-dir ./src/wasm --target nodejs",
-        "build": "bun run build:wasm"
+        "build": "bun run build:wasm",
+        "dev": "bun run examples:serve",
+        "examples:serve": "bun run examples/serve.ts",
+        "examples:pro-editor": "bun run examples/serve.ts",
+        "examples:marketing": "bun run examples/serve.ts",
+        "examples:personalization": "bun run examples/serve.ts",
+        "examples:social": "bun run examples/serve.ts"
     },
+    "keywords": [
+        "video",
+        "canvas",
+        "webcodecs",
+        "ffmpeg",
+        "puppeteer",
+        "video-generation",
+        "video-editing",
+        "personalization",
+        "marketing",
+        "social-media"
+    ],
     "peerDependencies": {
         "typescript": "^5.0.0"
     },
