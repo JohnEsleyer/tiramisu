@@ -133,8 +133,7 @@ function $(id) {
 }
 
 function initUI() {
-  ui.play = $('play');
-  ui.pause = $('pause');
+  ui.playToggle = $('play-toggle');
   ui.stop = $('stop');
   ui.scrub = $('scrub');
   ui.timecode = $('timecode');
@@ -373,8 +372,7 @@ function createClip(label) {
 }
 
 function bindControls() {
-  ui.play.addEventListener('click', () => play());
-  ui.pause.addEventListener('click', () => pause());
+  ui.playToggle.addEventListener('click', () => togglePlay());
   ui.stop.addEventListener('click', () => stop());
   ui.export.addEventListener('click', () => exportServerRender());
   if (ui.screenSize) {
@@ -414,6 +412,20 @@ function bindControls() {
 
   bindClipInputs('a', 0);
   bindClipInputs('b', 1);
+}
+
+function togglePlay() {
+  if (state.playing) {
+    pause();
+  } else {
+    play();
+  }
+  updatePlayButton();
+}
+
+function updatePlayButton() {
+  if (!ui.playToggle) return;
+  ui.playToggle.textContent = state.playing ? 'Pause' : 'Play';
 }
 
 function setExportModal(active, title, body) {
@@ -718,6 +730,7 @@ function bindClipInputs(prefix, index) {
       clip.saturation = parseFloat(group.sat.value) || 1;
       updateDuration();
       updateTimeline();
+      if (!state.playing) render();
     });
   });
 
@@ -778,6 +791,7 @@ function play() {
   state.playing = true;
   state.startTime = performance.now() / 1000 - state.playhead;
   ui.engine.textContent = 'playing';
+  updatePlayButton();
   tick();
 }
 
@@ -785,6 +799,7 @@ function pause() {
   state.playing = false;
   ui.engine.textContent = 'paused';
   state.videos.forEach(video => video && video.pause());
+  updatePlayButton();
 }
 
 function stop() {
@@ -973,6 +988,7 @@ function start() {
   updateTimecode();
   if (ui.engine && !state.initError) ui.engine.textContent = 'idle';
   if (!state.initError) render();
+  updatePlayButton();
   if (tabButtons.length) switchTab(tabButtons[0].dataset.tab);
 
   window.__webglNext = {
