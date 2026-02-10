@@ -39,7 +39,8 @@
         "dev:snow": "tsx examples/dev-server.ts --example=SnowOverlay",
         "dev:webgl": "tsx examples/dev-server.ts --example=WebGLEditor",
         "lint": "eslint src --ext .ts",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run"
     },
     "keywords": [
         "video",
@@ -54,7 +55,7 @@
     "peerDependencies": {
         "typescript": "^5.0.0"
     },
-    "packageManager": "pnpm@8.0.0",
+    "packageManager": "pnpm@8.15.9",
     "dependencies": {
         "mp4box": "^2.3.0",
         "puppeteer": "^22.0.0"
@@ -64,8 +65,10 @@
         "@typescript-eslint/eslint-plugin": "^6.0.0",
         "@typescript-eslint/parser": "^6.0.0",
         "eslint": "^8.0.0",
+        "happy-dom": "^14.12.3",
         "typescript": "^5.7.0",
         "tsx": "^4.7.1",
+        "vitest": "^2.1.9",
         "esbuild": "^0.20.1"
     },
     "engines": {
