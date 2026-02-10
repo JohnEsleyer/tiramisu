@@ -1,4 +1,4 @@
-import { TiramisuPlayer } from "../../src/Client";
+import { TiramisuPlayer } from "../../src/Client.js";
 
 const appState = {
     width: 1280,

@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tiramisu WebGL Editor Next</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
+
+    :root {
+      --bg-0: #07090f;
+      --bg-1: #0f172a;
+      --bg-2: #1e293b;
+      --accent-0: #f97316;
+      --accent-1: #22d3ee;
+      --accent-2: #facc15;
+      --ink-0: #e2e8f0;
+      --ink-1: #94a3b8;
+      --panel: rgba(15, 23, 42, 0.85);
+      --stroke: rgba(148, 163, 184, 0.18);
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      --screen-aspect: 16 / 9;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background:
+        radial-gradient(1100px 520px at 15% 10%, rgba(34, 211, 238, 0.12), transparent 60%),
+        radial-gradient(900px 520px at 85% 20%, rgba(249, 115, 22, 0.12), transparent 55%),
+        linear-gradient(180deg, var(--bg-0), var(--bg-1));
+      color: var(--ink-0);
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 14px;
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .title h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+
+    .title span {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 11px;
+      color: var(--ink-1);
+    }
+
+    .badge {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(34, 211, 238, 0.18);
+      color: var(--accent-1);
+      font-weight: 600;
+      font-size: 11px;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) 360px;
+      gap: 14px;
+      min-height: 0;
+      height: calc(100vh - 96px);
+    }
+
+    .left-stack {
+      display: grid;
+      grid-template-rows: auto auto auto;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .stage {
+      position: relative;
+      background: linear-gradient(140deg, #0b1324, #05070f);
+      border: 1px solid var(--stroke);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 0;
+      max-height: 62vh;
+      padding: 18px;
+    }
+
+    .screen-frame {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      aspect-ratio: var(--screen-aspect);
+      border-radius: 14px;
+      background: #05070f;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.8), 0 12px 30px rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+    }
+
+    .screen-frame::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .screen-frame::after {
+      content: '';
+      position: absolute;
+      inset: 6%;
+      border: 1px dashed rgba(249, 115, 22, 0.35);
+      border-radius: 10px;
+      pointer-events: none;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hud {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(5, 7, 15, 0.65);
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 12px;
+    }
+
+    .hud .badge {
+      background: rgba(250, 204, 21, 0.18);
+      color: var(--accent-2);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 10px;
+      min-height: 0;
+      height: 100%;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+      box-shadow: var(--shadow);
+    }
+
+    .card h2 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--ink-1);
+    }
+
+    .row {
+      display: grid;
+      gap: 6px;
+    }
+
+    .row label {
+      font-size: 11px;
+      color: var(--ink-1);
+    }
+
+    .inline {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .inline input,
+    .inline select,
+    .screen-grid select,
+    .screen-grid input,
+    .screen-custom input {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      background: rgba(15, 23, 42, 0.6);
+      color: var(--ink-0);
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 11px;
+    }
+
+    .file-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--ink-0);
+      cursor: pointer;
+      font-size: 11px;
+      transition: background 0.2s ease;
+    }
+
+    .file-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .status {
+      font-size: 10px;
+      color: var(--ink-1);
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    }
+
+    .status.warning {
+      color: var(--accent-2);
+    }
+
+    .slider {
+      display: grid;
+      gap: 6px;
+    }
+
+    .slider input[type="range"] {
+      appearance: none;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.15);
+      outline: none;
+    }
+
+    .slider input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent-1);
+      border: 2px solid #0b1220;
+    }
+
+    .screen-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .screen-custom {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .screen-custom button {
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--ink-0);
+      font-weight: 600;
+      padding: 6px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+
+    .screen-meta {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .screen-pill {
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(15, 23, 42, 0.6);
+      color: var(--ink-0);
+      font-size: 10px;
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    }
+
+    .transport {
+      display: grid;
+      grid-template-columns: auto auto auto 1fr auto auto;
+      align-items: center;
+      gap: 10px;
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      padding: 10px 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .transport button {
+      border: none;
+      background: var(--accent-1);
+      color: #041b19;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .transport button.secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--ink-0);
+      border: 1px solid var(--stroke);
+    }
+
+    .transport input[type="range"] {
+      appearance: none;
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent-1), var(--accent-0));
+      outline: none;
+    }
+
+    .transport input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #0f172a;
+      border: 2px solid var(--accent-1);
+      cursor: pointer;
+    }
+
+    .timecode {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      color: var(--ink-1);
+      min-width: 110px;
+      text-align: right;
+      font-size: 11px;
+    }
+
+    .export {
+      display: grid;
+      gap: 4px;
+      justify-items: end;
+      min-width: 140px;
+    }
+
+    .timeline {
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      padding: 10px 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .lane {
+      position: relative;
+      height: 40px;
+      border-radius: 10px;
+      border: 1px dashed rgba(255, 255, 255, 0.08);
+      background: rgba(15, 23, 42, 0.6);
+      overflow: hidden;
+    }
+
+    .clip {
+      position: absolute;
+      top: 6px;
+      bottom: 6px;
+      border-radius: 8px;
+      background: linear-gradient(120deg, rgba(249, 115, 22, 0.9), rgba(250, 204, 21, 0.9));
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .playhead {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--accent-1);
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      padding: 12px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 10px;
+      box-shadow: var(--shadow);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .tab {
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--ink-0);
+      font-size: 11px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: rgba(34, 211, 238, 0.2);
+      border-color: rgba(34, 211, 238, 0.4);
+      color: var(--accent-1);
+      font-weight: 600;
+    }
+
+    .panel-body {
+      overflow-y: auto;
+      display: grid;
+      gap: 12px;
+      padding-right: 4px;
+    }
+
+    .panel-section {
+      display: grid;
+      gap: 10px;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(5, 7, 12, 0.7);
+      backdrop-filter: blur(6px);
+      z-index: 50;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-card {
+      width: min(420px, 90vw);
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 18px;
+      padding: 20px 22px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+      display: grid;
+      gap: 14px;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .modal-body {
+      font-size: 13px;
+      color: var(--ink-1);
+      line-height: 1.5;
+    }
+
+    .progress-bar {
+      position: relative;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      position: absolute;
+      inset: 0;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-1), var(--accent-0));
+      transition: width 0.2s ease;
+    }
+
+    @media (max-width: 1200px) {
+      .workspace {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      body {
+        overflow: auto;
+      }
+
+      .controls {
+        height: auto;
+      }
+    }
+
+    @media (max-width: 980px) {
+      .transport {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        row-gap: 8px;
+      }
+
+      .export {
+        justify-items: start;
+        min-width: 0;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .inline {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .screen-grid,
+      .screen-custom {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-height: 800px) and (orientation: landscape) {
+      .stage {
+        max-height: 52vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">
+      <h1>WebGL Editor Next</h1>
+      <span>Two-layer compositor with timeline + live shader grading</span>
+    </div>
+    <div class="badge">Preview Build</div>
+  </header>
+
+    <div class="workspace">
+      <div class="left-stack">
+      <div class="stage" id="stage">
+        <div class="screen-frame" id="screen-frame">
+          <canvas id="gl-canvas"></canvas>
+        </div>
+        <div class="hud">
+          <span>Engine</span>
+          <span class="badge" id="engine-state">idle</span>
+          <span id="fps">0 fps</span>
+          <span class="badge" id="screen-badge">1920x1080</span>
+        </div>
+      </div>
+
+      <div class="transport">
+        <button id="play-toggle">Play</button>
+        <button id="stop" class="secondary">Stop</button>
+        <input id="scrub" type="range" min="0" max="10" step="0.01" value="0" />
+        <div class="timecode" id="timecode">0:00 / 0:00</div>
+        <div class="export">
+          <button id="export" class="secondary">Export MP4</button>
+          <div class="status" id="export-status">Server export idle</div>
+        </div>
+      </div>
+
+      <div class="timeline">
+        <div>
+          <strong>Timeline</strong>
+          <div class="status">Clip lanes update live. Scrub to preview.</div>
+        </div>
+        <div class="lane" id="lane-a">
+          <div class="playhead" id="playhead-a"></div>
+        </div>
+        <div class="lane" id="lane-b">
+          <div class="playhead" id="playhead-b"></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div class="tabs" id="panel-tabs">
+        <button class="tab active" data-tab="screen">Screen</button>
+        <button class="tab" data-tab="layer-a">Layer A</button>
+        <button class="tab" data-tab="layer-b">Layer B</button>
+      </div>
+
+      <div class="panel-body">
+        <div class="panel-section" data-tab-content="screen">
+          <h2>Screen</h2>
+          <div class="screen-grid">
+            <div class="row">
+              <label>Size</label>
+              <select id="screen-size">
+                <option value="">Custom</option>
+                <option value="1920x1080">1920 x 1080 (16:9)</option>
+                <option value="1280x720">1280 x 720 (HD)</option>
+                <option value="2560x1440">2560 x 1440 (QHD)</option>
+                <option value="3840x2160">3840 x 2160 (4K)</option>
+                <option value="1080x1920">1080 x 1920 (9:16)</option>
+                <option value="1080x1080">1080 x 1080 (1:1)</option>
+              </select>
+            </div>
+            <div class="row">
+              <label>Fit</label>
+              <select id="fit-mode">
+                <option value="contain">Maintain Ratio</option>
+                <option value="cover">Crop to Fill</option>
+              </select>
+            </div>
+          </div>
+          <div class="screen-custom">
+            <div class="row">
+              <label>Custom Width</label>
+              <input id="screen-width" type="number" min="320" step="1" value="1920" />
+            </div>
+            <div class="row">
+              <label>Custom Height</label>
+              <input id="screen-height" type="number" min="240" step="1" value="1080" />
+            </div>
+            <button id="screen-apply">Apply</button>
+          </div>
+          <div class="screen-meta">
+            <div class="screen-pill" id="screen-status">Screen 1920x1080</div>
+            <div class="screen-pill" id="screen-aspect">Aspect 16:9</div>
+          </div>
+        </div>
+
+        <div class="panel-section" data-tab-content="layer-a" hidden>
+          <h2>Layer A</h2>
+          <label class="file-btn" for="file-a">Load Video A</label>
+          <input id="file-a" type="file" accept="video/*" />
+          <button id="sample-a" class="file-btn">Load Sample A</button>
+          <div class="status" id="status-a">No source loaded</div>
+          <div class="status warning" id="ratio-a"></div>
+          <div class="inline">
+            <div class="row">
+              <label>Start</label>
+              <input id="start-a" type="number" step="0.1" value="0" />
+            </div>
+            <div class="row">
+              <label>Duration</label>
+              <input id="duration-a" type="number" step="0.1" value="6" />
+            </div>
+            <div class="row">
+              <label>Opacity</label>
+              <input id="opacity-a" type="number" step="0.05" value="1" />
+            </div>
+          </div>
+          <div class="inline">
+            <div class="row">
+              <label>Scale</label>
+              <input id="scale-a" type="number" step="0.05" value="1" />
+            </div>
+            <div class="row">
+              <label>X</label>
+              <input id="x-a" type="number" step="0.02" value="0.5" />
+            </div>
+            <div class="row">
+              <label>Y</label>
+              <input id="y-a" type="number" step="0.02" value="0.5" />
+            </div>
+          </div>
+          <div class="inline">
+            <div class="row">
+              <label>Rotate</label>
+              <input id="rot-a" type="number" step="0.05" value="0" />
+            </div>
+          </div>
+          <div class="panel-section">
+            <h2>Grade</h2>
+            <div class="slider">
+              <label>Brightness</label>
+              <input id="bright-a" type="range" min="-0.5" max="0.5" step="0.01" value="0" />
+            </div>
+            <div class="slider">
+              <label>Contrast</label>
+              <input id="contrast-a" type="range" min="0.5" max="1.6" step="0.01" value="1" />
+            </div>
+            <div class="slider">
+              <label>Saturation</label>
+              <input id="sat-a" type="range" min="0" max="2" step="0.01" value="1" />
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section" data-tab-content="layer-b" hidden>
+          <h2>Layer B</h2>
+          <label class="file-btn" for="file-b">Load Video B</label>
+          <input id="file-b" type="file" accept="video/*" />
+          <button id="sample-b" class="file-btn">Load Sample B</button>
+          <div class="status" id="status-b">No source loaded</div>
+          <div class="status warning" id="ratio-b"></div>
+          <div class="inline">
+            <div class="row">
+              <label>Start</label>
+              <input id="start-b" type="number" step="0.1" value="3" />
+            </div>
+            <div class="row">
+              <label>Duration</label>
+              <input id="duration-b" type="number" step="0.1" value="6" />
+            </div>
+            <div class="row">
+              <label>Opacity</label>
+              <input id="opacity-b" type="number" step="0.05" value="0.9" />
+            </div>
+          </div>
+          <div class="inline">
+            <div class="row">
+              <label>Scale</label>
+              <input id="scale-b" type="number" step="0.05" value="0.75" />
+            </div>
+            <div class="row">
+              <label>X</label>
+              <input id="x-b" type="number" step="0.02" value="0.75" />
+            </div>
+            <div class="row">
+              <label>Y</label>
+              <input id="y-b" type="number" step="0.02" value="0.5" />
+            </div>
+          </div>
+          <div class="inline">
+            <div class="row">
+              <label>Rotate</label>
+              <input id="rot-b" type="number" step="0.05" value="0" />
+            </div>
+          </div>
+          <div class="panel-section">
+            <h2>Grade</h2>
+            <div class="slider">
+              <label>Brightness</label>
+              <input id="bright-b" type="range" min="-0.5" max="0.5" step="0.01" value="0" />
+            </div>
+            <div class="slider">
+              <label>Contrast</label>
+              <input id="contrast-b" type="range" min="0.5" max="1.6" step="0.01" value="1" />
+            </div>
+            <div class="slider">
+              <label>Saturation</label>
+              <input id="sat-b" type="range" min="0" max="2" step="0.01" value="1" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="modal" id="export-modal" role="dialog" aria-live="polite" aria-busy="true">
+    <div class="modal-card">
+      <div class="modal-title" id="export-modal-title">Rendering on server</div>
+      <div class="modal-body" id="export-modal-body">Preparing render job...</div>
+      <div class="progress-bar" aria-hidden="true">
+        <div class="progress-fill" id="export-progress-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js?v=2"></script>
+</body>
+</html>

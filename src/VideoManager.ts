@@ -1,5 +1,5 @@
-import { spawn } from "bun";
-import { mkdir, readdir } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { mkdir, readdir, writeFile, stat } from "node:fs/promises";
 import { join, basename, isAbsolute } from "node:path";
 import { existsSync } from "node:fs";
 
@@ -15,8 +15,7 @@ export class VideoManager {
             throw new Error("Video file not found for frame extraction.");
         }
         
-        const file = Bun.file(absolutePath);
-        const stats = await file.stat();
+        const stats = await stat(absolutePath);
         
         const videoId = [
             basename(videoPath).replace(/[^a-z0-9]/gi, '_'),
@@ -27,8 +26,8 @@ export class VideoManager {
         const outputDir = join(this.cacheDir, videoId);
         await mkdir(this.cacheDir, { recursive: true });
 
-        const marker = Bun.file(join(outputDir, "done.marker"));
-        if (await marker.exists()) {
+        const markerPath = join(outputDir, "done.marker");
+        if (existsSync(markerPath)) {
             const files = await readdir(outputDir);
             return { folder: outputDir, count: files.filter(f => f.endsWith(".jpg")).length };
         }
@@ -44,8 +43,16 @@ export class VideoManager {
             join(outputDir, "frame_%05d.jpg")
         ];
 
-        const proc = spawn(ffmpegArgs, { stdout: "ignore", stderr: "inherit" });
-        await proc.exited;
+        const proc = spawn(ffmpegArgs[0], ffmpegArgs.slice(1), { 
+            stdio: ["ignore", "ignore", "inherit"] 
+        });
+        await new Promise<void>((resolve, reject) => {
+            proc.on('close', (code) => {
+                if (code === 0) resolve();
+                else reject(new Error(`FFmpeg exited with code ${code}`));
+            });
+            proc.on('error', reject);
+        });
         
         const tempFiles = await readdir(outputDir);
         const frameCount = tempFiles.filter(f => f.endsWith(".jpg")).length;
@@ -54,7 +61,7 @@ export class VideoManager {
              throw new Error("FFmpeg failed to extract video frames.");
         }
         
-        await Bun.write(join(outputDir, "done.marker"), "done");
+        await writeFile(join(outputDir, "done.marker"), "done");
         return { folder: outputDir, count: frameCount };
     }
 }

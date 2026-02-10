@@ -1,4 +1,4 @@
-import { spawn } from "bun";
+import { spawn } from "node:child_process";
 import { join, isAbsolute } from "path";
 import { existsSync } from "fs";
 
@@ -55,17 +55,27 @@ export class AudioAnalyzer {
             "-",
         ];
 
-        const proc = spawn(ffmpegArgs, { stdout: "pipe", stderr: "inherit" });
-        const reader = proc.stdout.getReader();
-        let chunks: Uint8Array[] = [];
+        const proc = spawn(ffmpegArgs[0], ffmpegArgs.slice(1), { 
+            stdio: ["ignore", "pipe", "inherit"] 
+        });
+        
+        const chunks: Uint8Array[] = [];
         let totalLength = 0;
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            chunks.push(value);
-            totalLength += value.length;
-        }
+        await new Promise<void>((resolve, reject) => {
+            if (!proc.stdout) {
+                reject(new Error("No stdout available"));
+                return;
+            }
+            
+            proc.stdout.on('data', (chunk) => {
+                chunks.push(chunk);
+                totalLength += chunk.length;
+            });
+            
+            proc.stdout.on('end', resolve);
+            proc.on('error', reject);
+        });
 
         if (totalLength === 0)
             return Array(totalFrames).fill({

@@ -3,14 +3,15 @@ import { TiramisuBrowser } from "./Browser.js";
 import { TiramisuEncoder } from "./Encoder.js";
 import { TiramisuCLI } from "./CLI.js";
 import { AudioAnalyzer } from "./AudioAnalysis.js";
-import { VideoManager } from "./VideoManager.js";
+import { spawn } from "node:child_process";
+import { unlinkSync, writeFileSync } from "fs";
 import type {
     RenderConfig,
     DrawFunction,
     Clip,
     ProgressPayload,
+    WorkerPayload,
 } from "./types.js";
-import { join } from "path";
 
 export class Tiramisu<T = any> {
     private config: RenderConfig<T>;
@@ -36,6 +37,18 @@ export class Tiramisu<T = any> {
     }
 
     public async render(onProgress?: (p: ProgressPayload) => void) {
+        const numWorkers = this.config.parallel || 1;
+
+        if (numWorkers > 1) {
+            return this.renderParallel(numWorkers, onProgress);
+        } else {
+            return this.renderSingleThreaded(onProgress);
+        }
+    }
+
+    private async renderSingleThreaded(
+        onProgress?: (p: ProgressPayload) => void,
+    ) {
         const {
             width,
             height,
@@ -49,22 +62,9 @@ export class Tiramisu<T = any> {
         const totalFrames = Math.ceil(fps * durationSeconds);
         const startTime = performance.now();
 
-        const videoManager = new VideoManager();
-        const videoFrameMaps: Record<
-            string,
-            { folder: string; count: number }
-        > = {};
-
-        if (this.config.videos) {
-            for (const path of this.config.videos) {
-                const relativePath = path.startsWith("/")
-                    ? path.slice(1)
-                    : path;
-                const fsPath = join(process.cwd(), relativePath);
-                const result = await videoManager.extractFrames(fsPath, fps);
-                videoFrameMaps[path] = result;
-            }
-        }
+        // PHASE 3 CHANGE: No more extraction!
+        // We just verify files exist and pass paths to the browser.
+        const videoPaths = this.config.videos || [];
 
         const server = new TiramisuServer();
         const browser = new TiramisuBrowser();
@@ -90,7 +90,7 @@ export class Tiramisu<T = any> {
             height,
             data || {},
             this.config.assets || [],
-            Object.keys(videoFrameMaps),
+            videoPaths,
             audioAnalysisData,
         );
 
@@ -98,11 +98,7 @@ export class Tiramisu<T = any> {
 
         for (let i = 0; i < totalFrames; i++) {
             const vMap: Record<string, string> = {};
-            for (const [key, info] of Object.entries(videoFrameMaps)) {
-                const idx = (i % info.count) + 1;
-                vMap[key] =
-                    `/${info.folder}/frame_${idx.toString().padStart(5, "0")}.jpg`;
-            }
+            videoPaths.forEach(p => vMap[p] = `${url}/${p}`);
 
             const { rms, bands } = audioAnalysisData[i] || {
                 rms: 0,
@@ -141,6 +137,148 @@ export class Tiramisu<T = any> {
         await encoder.close();
         await browser.close();
         server.stop();
+        cli.finish(outputFile!);
+    }
+
+    private async renderParallel(
+        numWorkers: number,
+        onProgress?: (p: ProgressPayload) => void,
+    ) {
+        const { fps, durationSeconds, outputFile, audioFile } = this.config;
+        const totalFrames = Math.ceil(fps * durationSeconds);
+        const framesPerChunk = Math.ceil(totalFrames / numWorkers);
+        const startTime = performance.now();
+
+        console.log(`🚀 Parallel Render: Spawning ${numWorkers} workers...`);
+
+        const workerPromises: Promise<void>[] = [];
+        const chunkFiles: string[] = [];
+        let completedFrames = 0;
+        const cli = new TiramisuCLI(totalFrames);
+        cli.start();
+
+        for (let i = 0; i < numWorkers; i++) {
+            const startFrame = i * framesPerChunk;
+            const endFrame = Math.min(startFrame + framesPerChunk, totalFrames);
+
+            const worker = new Worker(
+                new URL("./RenderWorker.ts", import.meta.url).href,
+                {
+                    type: "module",
+                },
+            );
+
+            const promise = new Promise<void>((resolve, reject) => {
+                worker.onmessage = (event) => {
+                    if (event.data.type === "progress") {
+                        completedFrames++;
+                        cli.update(completedFrames);
+
+                        if (onProgress) {
+                            const elapsedSeconds =
+                                (performance.now() - startTime) / 1000;
+                            const actualFps = completedFrames / elapsedSeconds;
+                            const remainingFrames = totalFrames - completedFrames;
+                            const etaSeconds =
+                                completedFrames > 0
+                                    ? Math.round(remainingFrames / actualFps)
+                                    : 0;
+
+                            onProgress({
+                                frame: completedFrames,
+                                total: totalFrames,
+                                percent: Math.round(
+                                    (completedFrames / totalFrames) * 100,
+                                ),
+                                eta: etaSeconds,
+                            });
+                        }
+                    } else if (event.data.type === "done") {
+                        chunkFiles.push(event.data.chunkOutputFile);
+                        worker.terminate();
+                        resolve();
+                    }
+                };
+
+                worker.onerror = (error) => {
+                    console.error(`Worker ${i} error:`, error);
+                    worker.terminate();
+                    reject(error);
+                };
+            });
+
+            const payload: WorkerPayload = {
+                workerId: i,
+                startFrame,
+                endFrame,
+                config: this.config,
+                clips: this.clips,
+            };
+
+            worker.postMessage(payload);
+            workerPromises.push(promise);
+        }
+
+        await Promise.all(workerPromises);
+
+        console.log(`\n📦 Stitching ${chunkFiles.length} fragments...`);
+
+        chunkFiles.sort((a, b) => {
+            const numA = parseInt(a.match(/\d+/)![0]);
+            const numB = parseInt(b.match(/\d+/)![0]);
+            return numA - numB;
+        });
+
+        const concatListPath = ".tiramisu-concat.txt";
+        const listContent = chunkFiles.map((f) => `file '${f}'`).join("\n");
+        writeFileSync(concatListPath, listContent);
+
+        const finalArgs = [
+            "ffmpeg",
+            "-y",
+            "-loglevel",
+            "error",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            concatListPath,
+        ];
+
+        if (audioFile) {
+            finalArgs.push("-i", audioFile);
+            finalArgs.push(
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a:0",
+                "-shortest",
+            );
+        } else {
+            finalArgs.push("-c", "copy");
+        }
+
+        finalArgs.push(outputFile!);
+
+        const proc = spawn(finalArgs[0], finalArgs.slice(1));
+        await new Promise<void>((resolve, reject) => {
+            proc.on('close', (code) => {
+                if (code === 0) resolve();
+                else reject(new Error(`FFmpeg exited with code ${code}`));
+            });
+            proc.on('error', reject);
+        });
+
+        chunkFiles.forEach((f) => {
+            try { unlinkSync(f); } catch (e) {}
+        });
+        try { unlinkSync(concatListPath); } catch (e) {}
+
         cli.finish(outputFile!);
     }
 }

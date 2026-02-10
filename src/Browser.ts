@@ -1,5 +1,6 @@
 import puppeteer, { type Browser, type Page } from "puppeteer";
 import { BROWSER_UTILS_CODE } from "./Utils.js";
+import { WEBCODECS_LOGIC } from "./WebCodecsLogic.js";
 import type { Clip } from "./types.js";
 
 export class TiramisuBrowser {
@@ -9,7 +10,14 @@ export class TiramisuBrowser {
     public async init(width: number, height: number, headless: boolean) {
         this.browser = await puppeteer.launch({
             headless: headless ? "shell" : false,
-            args: ["--no-sandbox", "--disable-setuid-sandbox"],
+            args: [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--enable-gpu",
+                "--use-gl=angle",
+                "--ignore-gpu-blocklist",
+                "--disable-software-rasterizer"
+            ],
         });
         this.page = await this.browser.newPage();
         await this.page.setViewport({ width, height, deviceScaleFactor: 1 });
@@ -27,7 +35,26 @@ export class TiramisuBrowser {
     ) {
         if (!this.page) return;
         await this.page.goto(url);
+
+        // Define __name helper for esbuild-injected function naming
+        await this.page.evaluate(() => {
+            (window as any).__name = (fn: any) => fn;
+        });
+        
+        const hasVideos = Array.isArray(videoKeys) && videoKeys.length > 0;
+        const useVideoElement = !!data?.useVideoElement;
+
+        // Inject utilities
         await this.page.evaluate(BROWSER_UTILS_CODE);
+
+        // Inject MP4Box + WebCodecs only when videos are present and enabled
+        if (hasVideos && !useVideoElement) {
+            await this.page.evaluate(async () => {
+                const mod = await import("/node_modules/mp4box/dist/mp4box.all.js");
+                (window as any).MP4Box = mod;
+            });
+            await this.page.evaluate(WEBCODECS_LOGIC);
+        }
 
         await this.page.evaluate(
             async (
@@ -62,9 +89,16 @@ export class TiramisuBrowser {
                 }
 
                 win.loadedVideos = {};
-                videoKeyList.forEach((key) => {
-                    win.loadedVideos[key] = new Image();
-                });
+                
+                if (!injectedData?.useVideoElement && videoKeyList.length > 0 && (window as any).initVideo) {
+                    // Initialize decoders for all videos in memory
+                    for (const videoUrl of videoKeyList) {
+                        await (window as any).initVideo(videoUrl);
+                    }
+                }
+                
+                // Type assertion for videoFrames
+                const videoFrames: Record<string, any> = {};
 
                 win.activeClips = clipList
                     .map((c) => ({
@@ -74,6 +108,8 @@ export class TiramisuBrowser {
                     .sort((a: any, b: any) => a.zIndex - b.zIndex);
 
                 win.audioData = levels; // store the analyzed RMS data from server
+
+                win.videoElements = new Map();
 
                 win.renderFrame = async (
                     frame: number,
@@ -85,35 +121,46 @@ export class TiramisuBrowser {
                 ) => {
                     const ctx = canvas.getContext("2d")!;
 
-                    // --- CRITICAL CHANGE: ADDING ERROR HANDLER TO IMAGE LOADS ---
-                    await Promise.all(
-                        Object.entries(vMap).map(([key, path]) => {
-                            return new Promise((res) => {
-                                const img = win.loadedVideos[key];
-                                // If src is already correct, resolve immediately
-                                if (img.src.includes(path)) return res(null);
+                    const videoFrames: Record<string, any> = {};
+                    const useVideoElement = !!injectedData?.useVideoElement;
 
-                                const onError = () => {
-                                    console.error(
-                                        `[Puppeteer] FAILED to load frame image: ${path}`,
-                                    );
-                                    img.removeEventListener("load", onLoad);
-                                    res(null); // Resolve to prevent render hang, even on failure
-                                };
+                    if (useVideoElement) {
+                        const time = frame / fps;
+                        for (const [key, path] of Object.entries(vMap)) {
+                            let video = win.videoElements.get(key);
+                            if (!video) {
+                                video = document.createElement("video");
+                                video.muted = true;
+                                video.playsInline = true;
+                                video.preload = "auto";
+                                video.crossOrigin = "anonymous";
+                                video.src = path;
+                                win.videoElements.set(key, video);
+                                await new Promise((resolve) => {
+                                    video.addEventListener("loadeddata", resolve, { once: true });
+                                });
+                            }
 
-                                const onLoad = () => {
-                                    img.removeEventListener("error", onError); // Cleanup
-                                    res(null);
-                                };
-
-                                img.onload = onLoad;
-                                img.onerror = onError;
-
-                                img.src = path;
-                            });
-                        }),
-                    );
-                    // --- END CRITICAL CHANGE ---
+                            if (Number.isFinite(time)) {
+                                if (Math.abs(video.currentTime - time) > 0.02) {
+                                    await new Promise((resolve) => {
+                                        const onSeeked = () => resolve(undefined);
+                                        video.addEventListener("seeked", onSeeked, { once: true });
+                                        video.currentTime = Math.max(0, time);
+                                    });
+                                }
+                                videoFrames[key] = video;
+                            }
+                        }
+                    } else {
+                        // Fetch frames from WebCodecs Decoders instead of <img> tags
+                        for (const [key] of Object.entries(vMap)) {
+                            const controller = (window as any).VideoDecoders.get(key);
+                            if (controller) {
+                                videoFrames[key] = await controller.getFrame(frame, fps);
+                            }
+                        }
+                    }
 
                     ctx.clearRect(0, 0, w, h);
                     for (const clip of win.activeClips) {
@@ -133,8 +180,15 @@ export class TiramisuBrowser {
                                 audioBands: bands,
                                 data: injectedData,
                                 assets: win.loadedAssets,
-                                videos: win.loadedVideos,
+                                videos: videoFrames,
                                 utils: win.TiramisuUtils,
+                                layer: {
+                                    create: (lw?: number, lh?: number) => {
+                                        const layerWidth = lw ?? w;
+                                        const layerHeight = lh ?? h;
+                                        return win.TiramisuUtils.createLayer(layerWidth, layerHeight);
+                                    },
+                                },
                             });
                         }
                     }

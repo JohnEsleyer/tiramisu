@@ -1,5 +1,5 @@
-import { Tiramisu } from "../src/Tiramisu";
-import type { DrawFunction } from "../src/types";
+import { Tiramisu } from "../src/Tiramisu.js";
+import type { DrawFunction } from "../src/types.js";
 
 const PORT = 3000;
 console.log(`🚀 Tiramisu Server starting on http://localhost:${PORT}`);
@@ -267,6 +267,13 @@ Bun.serve({
 
     async fetch(req) {
         const url = new URL(req.url);
+
+        // WEBGL EDITOR NEXT (demo-only)
+        if (url.pathname === "/webgl-editor-next" || url.pathname === "/webgl-editor-next/") {
+            const file = Bun.file("./examples/webgl-editor-next/index.html");
+            if (await file.exists()) return new Response(file);
+            return new Response("Not Found", { status: 404 });
+        }
 
         // --- NEW: MEME GENERATOR EXPORT ---
         if (url.pathname === "/api/render-meme" && req.method === "POST") {
