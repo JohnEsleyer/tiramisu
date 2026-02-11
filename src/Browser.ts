@@ -50,8 +50,11 @@ export class TiramisuBrowser {
         // Inject MP4Box + WebCodecs only when videos are present and enabled
         if (hasVideos && !useVideoElement) {
             await this.page.evaluate(async () => {
-                // @ts-ignore - resolved by the dev server at runtime in the browser context
-                const mod = await import("/node_modules/mp4box/dist/mp4box.all.js");
+                // Keep the specifier non-literal so Node-side bundling does not try to resolve browser-only path.
+                const specifier = "/node_modules/mp4box/dist/mp4box.all.js";
+                // Indirect import prevents bundlers from statically resolving this browser-only path.
+                const loadModule = (path: string) => import(path);
+                const mod = await loadModule(specifier);
                 (window as any).MP4Box = mod;
             });
             await this.page.evaluate(WEBCODECS_LOGIC);
