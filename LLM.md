@@ -2,6 +2,12 @@
 
 Purpose: TypeScript video engine for programmatic compositions. Two main paths: server MP4 rendering with Canvas 2D and client preview, plus a WebGL/WebCodecs pipeline for GPU effects.
 
+## Install
+
+```bash
+npm install github.com/johnesleyer/tiramisu
+```
+
 ## Key Exports (index.ts)
 
 - `Tiramisu`: server renderer (Canvas 2D -> Puppeteer -> FFmpeg).
