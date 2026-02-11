@@ -6,8 +6,8 @@
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "repository": {
-        "type": "git",
-        "url": "https://https://github.com/JohnEsleyer/tiramisu"
+      "type": "git",
+      "url": "git+https://github.com/JohnEsleyer/tiramisu.git"
     },
     "exports": {
         ".": {
