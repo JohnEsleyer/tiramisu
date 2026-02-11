@@ -5,7 +5,7 @@
 ## Basic Usage
 
 ```ts
-import { TiramisuEditor } from "tiramisu";
+import { TiramisuEditor } from "@johnesleyer/tiramisu";
 
 const editor = new TiramisuEditor({
   canvas: "gl-canvas",

@@ -5,7 +5,7 @@ Server rendering uses a headless browser to draw frames and pipes them into FFmp
 ## Basic Render
 
 ```ts
-import { Tiramisu } from "tiramisu";
+import { Tiramisu } from "@johnesleyer/tiramisu";
 
 const engine = new Tiramisu({
   width: 1280,

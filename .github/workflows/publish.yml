@@ -1,25 +1,25 @@
-name: Publish Package to npmjs
+name: Publish to npm
 on:
-    push:
-        branches:
-            - main # Or 'master' depending on your repo
+    release:
+        types: [created]
 
 jobs:
-    publish:
+    build:
         runs-on: ubuntu-latest
         permissions:
             contents: read
-            id-token: write # Vital for the "keyless" provenance feature
+            id-token: write # Required for keyless authentication
         steps:
             - uses: actions/checkout@v4
             - uses: actions/setup-node@v4
               with:
-                  node-version: "20.x"
+                  node-version: "20"
                   registry-url: "https://registry.npmjs.org"
 
             - run: npm install
+            - run: npm run build # If you have a build step
 
-            # This publishes the package and links it to this GitHub Action
+            # This command uses the id-token permission to authenticate
             - run: npm publish --provenance --access public
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

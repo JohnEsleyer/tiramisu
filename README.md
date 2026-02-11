@@ -38,13 +38,13 @@ MP4 → MP4Box.js → VideoDecoder → VideoFrame → GPU Texture → Fragment S
 ## 📦 Installation
 
 ```bash
-npm install github.com/johnesleyer/tiramisu
+npm install @johnesleyer/tiramisu
 ```
 
 ## 🎯 Quick Start - Hello Video
 
 ```typescript
-import { TiramisuWebGLPlayer } from 'tiramisu/webgl';
+import { TiramisuWebGLPlayer } from '@johnesleyer/tiramisu/webgl';
 
 // Create WebGL player
 const player = new TiramisuWebGLPlayer({
@@ -166,7 +166,7 @@ npm run typecheck
 ### 2. Live Preview (Client-Side)
 Ideal for editors and dashboards.
 ```typescript
-import { TiramisuPlayer } from "tiramisu/client";
+import { TiramisuPlayer } from "@johnesleyer/tiramisu/client";
 
 const player = new TiramisuPlayer({
     width: 1280, height: 720, fps: 60,
@@ -181,7 +181,7 @@ player.play();
 ### 3. Final Render (Server-Side)
 Pipes frames to FFmpeg to generate an `.mp4`.
 ```typescript
-import { Tiramisu } from "tiramisu";
+import { Tiramisu } from "@johnesleyer/tiramisu";
 
 const engine = new Tiramisu({
     width: 1280, height: 720, fps: 30,

@@ -12,7 +12,7 @@ Purpose: TypeScript video engine for programmatic compositions. Two main paths: 
 ## Install
 
 ```bash
-npm install github.com/johnesleyer/tiramisu
+npm install @johnesleyer/tiramisu
 ```
 
 ## Setup: New Project (Server Render)
@@ -23,7 +23,7 @@ npm install github.com/johnesleyer/tiramisu
 
 ```bash
 npm init -y
-npm install github.com/johnesleyer/tiramisu
+npm install @johnesleyer/tiramisu
 npm install -D typescript tsx
 npx tsc --init
 ```
@@ -31,7 +31,7 @@ npx tsc --init
 `render.ts`:
 
 ```ts
-import { Tiramisu } from "tiramisu";
+import { Tiramisu } from "@johnesleyer/tiramisu";
 
 const engine = new Tiramisu({
   width: 1280,
@@ -70,7 +70,7 @@ npx tsx render.ts
 `main.ts`:
 
 ```ts
-import { TiramisuPlayer } from "tiramisu/client";
+import { TiramisuPlayer } from "@johnesleyer/tiramisu/client";
 
 const player = new TiramisuPlayer({
   canvas: "preview",
@@ -91,7 +91,7 @@ player.play();
 
 ## Add Tiramisu To An Existing Project
 
-- Install the package: `npm install github.com/johnesleyer/tiramisu`
+- Install the package: `npm install @johnesleyer/tiramisu`
 - Server render: Ensure FFmpeg is on PATH.
 - Server render: Ensure asset paths are resolvable from the server process (relative to `process.cwd()` or absolute).
 - Server render: Use `new Tiramisu(config)` and `await render()`.
@@ -111,7 +111,7 @@ import MP4Box from "mp4box";
 ## Key Exports (index.ts)
 
 - `Tiramisu`: server renderer (Canvas 2D -> Puppeteer -> FFmpeg).
-- `TiramisuPlayer`: client 2D preview (`tiramisu/client`).
+- `TiramisuPlayer`: client 2D preview (`@johnesleyer/tiramisu/client`).
 - `TiramisuWebGLPlayer`: WebGL/WebCodecs preview.
 - `TiramisuEditor`: editor-style WebGL API (tracks, clips, effects).
 - WebGL core: `TiramisuRenderer`, `TextureManager`, `ShaderManager`, `WebCodecsVideoSource`, shader constants.
@@ -120,7 +120,7 @@ import MP4Box from "mp4box";
 ## Server Render (MP4)
 
 ```ts
-import { Tiramisu } from "tiramisu";
+import { Tiramisu } from "@johnesleyer/tiramisu";
 
 const engine = new Tiramisu({
   width: 1280,
@@ -154,7 +154,7 @@ Notes:
 ## Client Preview (Canvas 2D)
 
 ```ts
-import { TiramisuPlayer } from "tiramisu/client";
+import { TiramisuPlayer } from "@johnesleyer/tiramisu/client";
 
 const player = new TiramisuPlayer({
   canvas: "preview",
@@ -176,7 +176,7 @@ player.play();
 ## WebGL Preview
 
 ```ts
-import { TiramisuWebGLPlayer } from "tiramisu";
+import { TiramisuWebGLPlayer } from "@johnesleyer/tiramisu";
 
 const player = new TiramisuWebGLPlayer({
   canvas: "gl",
@@ -200,7 +200,7 @@ WebCodecs notes:
 ## WebGL Editor
 
 ```ts
-import { TiramisuEditor } from "tiramisu";
+import { TiramisuEditor } from "@johnesleyer/tiramisu";
 
 const editor = new TiramisuEditor({ canvas: "gl", width: 1920, height: 1080, fps: 30, durationSeconds: 10 });
 const clip = editor.addVideo("/video/a.mp4", { start: 0, duration: 5, track: 1 });
@@ -222,10 +222,10 @@ Limitations:
 ### Imports
 
 ```ts
-import { Tiramisu } from "tiramisu";
-import { TiramisuPlayer } from "tiramisu/client";
-import { TiramisuWebGLPlayer, TiramisuEditor } from "tiramisu";
-import type { RenderConfig, RenderContext, WebGLRenderContext, Effect } from "tiramisu/types";
+import { Tiramisu } from "@johnesleyer/tiramisu";
+import { TiramisuPlayer } from "@johnesleyer/tiramisu/client";
+import { TiramisuWebGLPlayer, TiramisuEditor } from "@johnesleyer/tiramisu";
+import type { RenderConfig, RenderContext, WebGLRenderContext, Effect } from "@johnesleyer/tiramisu/types";
 ```
 
 ### RenderConfig (Common Fields)

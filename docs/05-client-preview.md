@@ -5,7 +5,7 @@ The `TiramisuPlayer` runs the same clip-based logic in the browser for previews 
 ## Basic Usage
 
 ```ts
-import { TiramisuPlayer } from "tiramisu/client";
+import { TiramisuPlayer } from "@johnesleyer/tiramisu/client";
 
 const player = new TiramisuPlayer({
   canvas: "preview",

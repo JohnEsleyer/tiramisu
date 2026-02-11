@@ -5,7 +5,7 @@ The WebGL pipeline is built around a video texture pipeline and shader effects. 
 ## TiramisuWebGLPlayer
 
 ```ts
-import { TiramisuWebGLPlayer } from "tiramisu";
+import { TiramisuWebGLPlayer } from "@johnesleyer/tiramisu";
 
 const player = new TiramisuWebGLPlayer({
   canvas: "gl-canvas",
@@ -38,7 +38,7 @@ player.play();
 ## Custom Shaders
 
 ```ts
-import { PASSTHROUGH_VERTEX_SHADER } from "tiramisu";
+import { PASSTHROUGH_VERTEX_SHADER } from "@johnesleyer/tiramisu";
 
 const renderer = player.getRenderer();
 const shaderManager = player.getShaderManager();
