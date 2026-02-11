@@ -33,8 +33,9 @@
     ],
     "scripts": {
         "clean": "rm -rf dist",
-        "build": "pnpm run clean && tsc && esbuild dist/index.js --bundle --format=esm --platform=node --outfile=dist/bundle.js",
+        "build": "npm run clean && tsc && esbuild dist/index.js --bundle --format=esm --platform=node --outfile=dist/bundle.js",
         "build:wasm": "cd docs && make && cd ..",
+        "prepack": "npm run build",
         "dev": "tsx examples/dev-server.ts",
         "dev:server": "tsx examples/dev-server.ts",
         "dev:watch": "tsc --watch",
