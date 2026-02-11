@@ -38,7 +38,7 @@ MP4 → MP4Box.js → VideoDecoder → VideoFrame → GPU Texture → Fragment S
 ## 📦 Installation
 
 ```bash
-npm install tiramisu
+npm install github.com/johnesleyer/tiramisu
 ```
 
 ## 🎯 Quick Start - Hello Video
