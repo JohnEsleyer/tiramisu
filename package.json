@@ -1,6 +1,6 @@
 {
     "name": "@johnesleyer/tiramisu",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "description": "WebGL-powered video creation engine with WebCodecs integration",
     "type": "module",
     "main": "./dist/index.js",

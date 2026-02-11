@@ -12,7 +12,7 @@ Purpose: TypeScript video engine for programmatic compositions. Two main paths: 
 ## Install
 
 ```bash
-npm install @johnesleyer/tiramisu
+npm install @johnesleyer/tiramisu@2.0.2
 ```
 
 ## Setup: New Project (Server Render)
@@ -23,7 +23,7 @@ npm install @johnesleyer/tiramisu
 
 ```bash
 npm init -y
-npm install @johnesleyer/tiramisu
+npm install @johnesleyer/tiramisu@2.0.2
 npm install -D typescript tsx
 npx tsc --init
 ```
@@ -91,7 +91,7 @@ player.play();
 
 ## Add Tiramisu To An Existing Project
 
-- Install the package: `npm install @johnesleyer/tiramisu`
+- Install the package: `npm install @johnesleyer/tiramisu@2.0.2`
 - Server render: Ensure FFmpeg is on PATH.
 - Server render: Ensure asset paths are resolvable from the server process (relative to `process.cwd()` or absolute).
 - Server render: Use `new Tiramisu(config)` and `await render()`.
