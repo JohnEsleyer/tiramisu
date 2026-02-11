@@ -10,7 +10,7 @@
 ## Install As A Library
 
 ```bash
-npm install tiramisu
+npm install github.com/johnesleyer/tiramisu
 ```
 
 ## Install From Source
