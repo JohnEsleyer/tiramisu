@@ -1,18 +1,22 @@
 {
     "name": "@johnesleyer/tiramisu",
-    "version": "2.0.2",
+    "version": "2.0.3",
     "description": "WebGL-powered video creation engine with WebCodecs integration",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/index.server.js",
+    "types": "./dist/index.server.d.ts",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/JohnEsleyer/tiramisu.git"
     },
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "types": "./dist/index.server.d.ts",
+            "import": "./dist/index.server.js"
+        },
+        "./editor": {
+            "types": "./dist/index.editor.d.ts",
+            "import": "./dist/index.editor.js"
         },
         "./client": {
             "types": "./dist/Client.d.ts",

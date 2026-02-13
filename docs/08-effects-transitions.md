@@ -40,7 +40,7 @@ Preset chains include `createVintageEffect()`, `createCinematicEffect()`, and `c
 ## LUTs
 
 ```ts
-import { LUTLoader } from "@johnesleyer/tiramisu";
+import { LUTLoader } from "@johnesleyer/tiramisu/editor";
 
 const lut = await LUTLoader.loadFromURL(gl, "/luts/teal_orange.cube");
 player.addEffect(shaderManager.createLUTEffect(lut, 1.0));
@@ -58,7 +58,7 @@ The transition system is modeled after gl-transitions. The `GL_TRANSITIONS` regi
 Example usage:
 
 ```ts
-import { GLTransitionManager } from "@johnesleyer/tiramisu";
+import { GLTransitionManager } from "@johnesleyer/tiramisu/editor";
 
 const transitionManager = new GLTransitionManager(shaderManager);
 transitionManager.registerAllTransitions();
