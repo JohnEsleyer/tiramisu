@@ -213,6 +213,242 @@ Limitations:
 - `TiramisuEditor` transitions and adjustment layers are stored but not rendered yet.
 - `TiramisuEditor.export()` is not implemented.
 
+## Complete Video + Graphics Player Implementation
+
+A production-ready player that displays videos with overlaid graphics, audio visualization, and GPU-accelerated effects.
+
+### 1. Setup (with MP4Box for WebGL)
+
+```ts
+// main.ts - Entry point
+import MP4Box from "mp4box";
+
+// MUST load MP4Box before creating WebGL players
+(window as any).MP4Box = MP4Box;
+
+import { TiramisuWebGLPlayer } from "@johnesleyer/tiramisu/webgl";
+
+const player = new TiramisuWebGLPlayer({
+  canvas: "canvas",
+  width: 1920,
+  height: 1080,
+  fps: 30,
+  durationSeconds: 30,
+  assets: ["/img/logo.png", "/img/overlay.png"],
+  videos: ["/video/intro.mp4", "/video/main.mp4"],
+  audioFile: "/audio/track.mp3",
+});
+
+await player.load();
+```
+
+### 2. Video Layer with Graphics Overlay (WebGL)
+
+```ts
+// Draw video frames with overlaid graphics
+player.addClip(0, 10, ({ gl, width, height, videos, assets, progress, audioBands }) => {
+  const video = videos["/video/intro.mp4"];
+  if (video) {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+  }
+  
+  // Draw logo in corner
+  const logo = assets["/img/logo.png"];
+  // Use texture manager for WebGL images
+});
+
+player.addClip(0, 10, ({ gl, width, height, audioBands, frame }) => {
+  // Audio-reactive graphics
+  const band = audioBands[0] || 0;
+  const scale = 1 + band * 0.5;
+  
+  // Draw pulsing circle based on audio
+  // ... WebGL draw calls
+});
+```
+
+### 3. Complete Canvas 2D Player (Simpler, Works Everywhere)
+
+```ts
+import { TiramisuPlayer } from "@johnesleyer/tiramisu/client";
+
+const player = new TiramisuPlayer({
+  canvas: "preview",
+  width: 1920,
+  height: 1080,
+  fps: 30,
+  durationSeconds: 30,
+  assets: ["/img/logo.png", "/img/background.png"],
+  videos: ["/video/clip.mp4"],
+  audioFile: "/audio/track.mp3",
+});
+
+// Background video layer (zIndex: 0)
+player.addClip(0, 30, ({ ctx, width, height, videos }) => {
+  const video = videos["/video/clip.mp4"];
+  if (video && video.readyState >= 2) {
+    ctx.drawImage(video, 0, 0, width, height);
+  }
+}, 0);
+
+// Graphics overlay (zIndex: 1)
+player.addClip(0, 30, ({ ctx, width, height, assets, progress }) => {
+  const logo = assets["/img/logo.png"];
+  if (logo) {
+    ctx.globalAlpha = Math.min(1, progress * 2);
+    ctx.drawImage(logo, 40, 40, 200, 200);
+    ctx.globalAlpha = 1;
+  }
+}, 1);
+
+// Audio visualization (zIndex: 2)
+player.addClip(0, 30, ({ ctx, width, height, audioBands, audioVolume }) => {
+  const barCount = 32;
+  const barWidth = width / barCount;
+  
+  for (let i = 0; i < barCount; i++) {
+    const band = audioBands[i] || 0;
+    const barHeight = band * height * 0.8;
+    
+    ctx.fillStyle = `hsl(${i * 10}, 70%, 50%)`;
+    ctx.fillRect(i * barWidth, height - barHeight, barWidth - 2, barHeight);
+  }
+}, 2);
+
+// Text overlay with animation
+player.addClip(5, 10, ({ ctx, width, height, localProgress }) => {
+  const alpha = localProgress < 0.2 ? localProgress * 5 
+             : localProgress > 0.8 ? (1 - localProgress) * 5 
+             : 1;
+  
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "white";
+  ctx.font = "bold 72px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("HELLO WORLD", width / 2, height / 2);
+  ctx.globalAlpha = 1;
+}, 3);
+
+await player.load();
+player.play();
+```
+
+### 4. Adding WebGL Effects
+
+```ts
+const shaderManager = player.getShaderManager();
+
+// Grayscale effect (intensity 0-1)
+player.addEffect(shaderManager.createGrayscaleEffect(0.3));
+
+// Brightness/contrast
+player.addEffect(shaderManager.createBrightnessContrastEffect(0.1, 1.2));
+
+// Chroma key (green screen removal)
+player.addEffect(shaderManager.createChromaKeyEffect(0, 1, 0, 0.3));
+
+// Custom shader
+const customEffect = {
+  id: "myEffect",
+  fragmentShader: `
+    precision mediump float;
+    uniform sampler2D u_source;
+    uniform float u_time;
+    varying vec2 v_texCoord;
+    void main() {
+      vec4 color = texture2D(u_source, v_texCoord);
+      float wave = sin(v_texCoord.y * 20.0 + u_time * 5.0) * 0.02;
+      gl_FragColor = texture2D(u_source, v_texCoord + vec2(wave, 0.0));
+    }
+  `,
+  uniforms: { u_time: () => player.getCurrentTime() },
+};
+
+player.addEffect(customEffect);
+```
+
+### 5. Player Controls
+
+```ts
+// Playback controls
+player.play();
+player.pause();
+player.seek(5); // Seek to 5 seconds
+player.setVolume(0.8);
+
+// Events
+player.onTimeUpdate = (time) => {
+  console.log("Current time:", time);
+};
+
+player.onEnded = () => {
+  console.log("Playback complete");
+};
+```
+
+### 6. Server-Side Rendering
+
+```ts
+import { Tiramisu } from "@johnesleyer/tiramisu";
+
+const engine = new Tiramisu({
+  width: 1920,
+  height: 1080,
+  fps: 30,
+  durationSeconds: 30,
+  outputFile: "output.mp4",
+  assets: ["assets/logo.png", "assets/background.png"],
+  videos: ["assets/clip.mp4"],
+  audioFile: "assets/track.mp3",
+});
+
+// Video background
+engine.addClip(0, 30, ({ ctx, width, height, videos }) => {
+  const video = videos["assets/clip.mp4"];
+  if (video) {
+    ctx.drawImage(video, 0, 0, width, height);
+  }
+}, 0);
+
+// Logo overlay
+engine.addClip(0, 30, ({ ctx, width, height, assets, progress }) => {
+  const logo = assets["assets/logo.png"];
+  if (logo) {
+    ctx.drawImage(logo, 40, 40, 200, 200);
+  }
+}, 1);
+
+// Audio-reactive bars
+engine.addClip(0, 30, ({ ctx, width, height, audioBands }) => {
+  const barCount = 32;
+  const barWidth = width / barCount;
+  
+  for (let i = 0; i < barCount; i++) {
+    const band = audioBands[i] || 0;
+    const barHeight = band * height * 0.8;
+    
+    ctx.fillStyle = `hsl(${i * 10}, 70%, 50%)`;
+    ctx.fillRect(i * barWidth, height - barHeight, barWidth - 2, barHeight);
+  }
+}, 2);
+
+await engine.render((progress) => {
+  console.log(`Rendered ${progress.frame}/${progress.total} (${progress.percent.toFixed(1)}%)`);
+});
+```
+
+### Key Differences: Canvas 2D vs WebGL
+
+| Feature | Canvas 2D | WebGL |
+|---------|-----------|-------|
+| Performance | Good for simple scenes | GPU-accelerated, better for effects |
+| Video decoding | `<video>` element | WebCodecs API |
+| Effects | Limited (globalCompositeOperation) | Shaders, chroma key, etc |
+| Complexity | Simpler API | More complex setup |
+| Browser support | Wide | Requires WebGL2 |
+
+Choose Canvas 2D for simplicity, WebGL for advanced effects and better performance with video.
+
 ## Utilities
 
 `utils` in render context includes `lerp`, `clamp`, easing, `drawMediaFit`, `drawMediaCover`, `drawMasked`, and `createLayer`.

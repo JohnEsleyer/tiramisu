@@ -6,7 +6,7 @@ export class WebCodecsVideoSource {
         this.onSeekComplete = null;
         this.onError = null;
         // Set MP4Box log level to reduce console spam
-        if (typeof MP4Box !== 'undefined') {
+        if (typeof MP4Box !== 'undefined' && typeof MP4Box.setLogLevel === 'function') {
             MP4Box.setLogLevel(0);
         }
     }

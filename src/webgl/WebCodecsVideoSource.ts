@@ -46,8 +46,7 @@ export class WebCodecsVideoSource {
     private onError: ((sourceId: string, error: Error) => void) | null = null;
     
     constructor() {
-        // Set MP4Box log level to reduce console spam
-        if (typeof MP4Box !== 'undefined') {
+        if (typeof MP4Box !== 'undefined' && typeof MP4Box.setLogLevel === 'function') {
             MP4Box.setLogLevel(0);
         }
     }
